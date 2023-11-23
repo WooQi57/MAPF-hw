@@ -53,7 +53,7 @@ def main():
     model = dqn_agent(env, args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"/model3.538501262664795.pt")
+        model.load_dict(model_path+"\model0.17251485586166382.pt")
     obs = env.reset(True)
     obs = [obs[0]]
     done = False
@@ -77,7 +77,7 @@ def main2():
     # load model to continue
     parser.add_argument("--load_model", default=True, type=bool)
     # save dir
-    parser.add_argument("--save_dir", default='./models', type=str)
+    parser.add_argument("--save_dir", default='.\models', type=str)
     args = parser.parse_args()
 
     robot_num = 25
@@ -86,7 +86,7 @@ def main2():
     model = dqn_agent(env, args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"/model3.538501262664795.pt")
+        model.load_dict(model_path+"\model0.17251485586166382.pt")
     obs = env.reset(True)
     robots, targets = env.information()
     pairs = get_allocate_matrix(robots, targets)

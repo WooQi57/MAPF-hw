@@ -1,4 +1,3 @@
-from os import minor
 import numpy as np
 from numpy import unravel_index
 from simulator import Simulator
