@@ -41,16 +41,18 @@ class Simulator:
         """
         generate random map to increase the complexity
         """
+        rnd = np.random
+        rnd.seed(5457)
         assert size[0]*size[1]>robot_num *scale*3
         for i in range(1,size[0]//scale):
             cv2.line(self.canvas, (scale*i,scale), (scale*i,(size[1]//scale-1)*scale), (0,0,0))
         for i in range(1,size[1]//scale):
             cv2.line(self.canvas, (scale,i*scale), ((size[0]//scale-1)*scale,i*scale), (0,0,0))
         if len(self.robot) == 0:
-            pos = np.random.randint(1,size[0]//scale, size=(3*robot_num,2))
+            pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
             pos = set([tuple(i) for i in pos])
             while len(pos) < 3*robot_num:
-                temp = np.random.randint(1,size[0]//scale, size=(3*robot_num - len(pos),2))
+                temp = rnd.randint(1,size[0]//scale, size=(3*robot_num - len(pos),2))
                 b = set([tuple(i) for i in temp])
                 for i in b:
                     if i not in pos:
@@ -61,7 +63,7 @@ class Simulator:
                 self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+2*robot_num][0], pos[i+2*robot_num][1])
         for i in range(robot_num):
             self.draw_target(self.canvas, np.array(self.target[i][2:])*scale, self.colours[i+len(self.robot)], 5)
-            self.robot_carry[i] = False       
+            self.robot_carry[i] = False    
 
     @staticmethod
     def assign_colour(num):
@@ -214,6 +216,11 @@ class Simulator:
     def simple_state(self, index, test=False):
         me = self.robot[index]
         state = np.zeros(7)
+        if index==0:
+            print("fuck")
+            print(self.target[self.robot[index][2]])
+            print(self.robot[index])
+            input()
         state[0] = (self.target[self.robot[index][2]][0] - self.robot[index][0])/(self.size[0]//scale+1)
         state[1] = (self.target[self.robot[index][2]][1] - self.robot[index][1])/(self.size[1]//scale+1)
         if test and self.robot_carry[index]==True:
@@ -356,6 +363,10 @@ class Simulator:
                 # print(lastmiddle, lastmiddle1, np.math.hypot(lastmiddle1[0]-lastmiddle[0],lastmiddle1[1]-lastmiddle[1]))
                 if np.math.hypot(pos[0]-pos2[0], pos[1]-pos2[1]) < 1 or np.math.hypot(lastmiddle1[0]-lastmiddle[0],lastmiddle1[1]-lastmiddle[1])<=0.5:
                     self.crash.append((id_,id2_))
+                    if np.math.hypot(pos[0]-pos2[0], pos[1]-pos2[1]) < 1:
+                        print(f"fucking robot crash{id_}:{pos},{id2_}:{pos2}")
+                    else:
+                        print("fucking lastmiddle crash")
                     return True
         return False
     

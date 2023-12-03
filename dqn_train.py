@@ -41,12 +41,12 @@ if __name__ == "__main__":
     # save model frequency
     parser.add_argument("--display_interval", default=1000, type=int)
     # load model to continue
-    parser.add_argument("--load_model", default=False, type=bool)
+    parser.add_argument("--load_model", default=True, type=bool)
     args = parser.parse_args()
 
     env = Simulator((601,601,3),5)
     model = dqn_agent(env, args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"/model.pt")
+        model.load_dict(model_path+"/model40.983375549316406.pt")
     model.learn_one()

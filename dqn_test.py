@@ -86,7 +86,7 @@ def main2():
     model = dqn_agent(env, args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"\model0.17251485586166382.pt")
+        model.load_dict(model_path+"\model40.983375549316406.pt")
     obs = env.reset(True)
     robots, targets = env.information()
     pairs = get_allocate_matrix(robots, targets)
