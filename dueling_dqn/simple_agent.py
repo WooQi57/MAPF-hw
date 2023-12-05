@@ -17,6 +17,8 @@ class dqn_agent:
         self.args = args
         self.target_net = copy.deepcopy(self.net)
         self.target_net.load_state_dict(self.net.state_dict())
+
+        self.timestamp = datetime.datetime.now().strftime("%m%d_%H%M%S")
         
         if self.args.cuda:
             self.net.cuda()
@@ -82,13 +84,18 @@ class dqn_agent:
         if not os.path.exists(self.args.save_dir):
             os.mkdir(self.args.save_dir)
         # set the environment folder
-        self.model_path = os.path.join(self.args.save_dir, self.args.env_name)
+        self.model_path = os.path.join(self.args.save_dir, self.args.env_name)        
         if not os.path.exists(self.model_path):
             os.mkdir(self.model_path)
         episode_reward = reward_recoder(1)
         obs = self.env.reset(True)
         obs = [obs[0]]
         td_loss = 0
+
+
+        sub_folder = f"M_{self.args.map_size}x{self.args.map_size}_{str(self.timestamp)}"
+        self.model_path = os.path.join(self.model_path, sub_folder)
+        
         for timestep in range(int(self.args.total_timesteps)):
             explore_eps = self.exploration_schedule.get_value(timestep)
             with torch.no_grad():
@@ -128,7 +135,14 @@ class dqn_agent:
             if done and episode_reward.num_episodes % self.args.display_interval == 0:
                 print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}'.format(datetime.datetime.now(), timestep, episode_reward.num_episodes, \
                         episode_reward.mean, td_loss))
-                torch.save(self.net.state_dict(), self.model_path + '/model'+str(td_loss)+'.pt')
+                
+                model_name = f"/model_E_{episode_reward.num_episodes}_R_{round(episode_reward.mean)}_L_{round(td_loss)}.pt"
+                
+                if not os.path.exists(self.model_path):
+                    os.mkdir(self.model_path)
+                model_name = os.path.join(self.model_path, model_name)
+
+                torch.save(self.net.state_dict(), self.model_path + model_name)
 
     def load_dict(self, path):
         state_dict = torch.load(path)

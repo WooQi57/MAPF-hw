@@ -157,21 +157,13 @@ class Simulator:
         states = []
         end = {}
 
-        prev_dist_list = [0.0 for i in action]
 
-
-        expected_length = 2 * self.args.map_size
-        if False:
-            gain = 0.01
-            loss = 0.4
+        if self.args.penalty_only:
+            gain = 0.2
+            loss = 1
         else:
             gain = 0.4
             loss = 0.2
-
-        
-        gain = 0
-        loss = 0
-
 
         for id_, pos in self.robot.items():
             pos2 = self.target[pos[2]]
@@ -210,26 +202,19 @@ class Simulator:
             if self.out_of_map(path[id_][0], self.size):
                 reward[id_] -= 20
                 done[id_] = True
-                # print("out of map!!!")
 
-            dist = abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1])
-
-            prev_dist_list[id_] = dist
-
-
-            if self.steps > expected_length:
+            if self.steps > 40:
+            # if self.steps > 20:
                 reward[id_] -= 10
+            # if self.steps > 80:
+                # reward[id_] -= 10
                 done[id_] = True
-
-
         self.steps += 1
         self.start(path, None, False)
 
         # Post Step
         if len(self.crash) > 0:
             for i in self.crash:
-                # print("crash!!!")
-
                 reward[i[0]] -= 20
                 reward[i[1]] -= 20
                 done[i[0]] = True
@@ -241,38 +226,16 @@ class Simulator:
                 # NOTE: USE THIS BRANCH
                 state = self.simple_state(id_, False)
             states.append(state)
-
-
-            dist = abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1])
-
-            step_reward = 0
-            dist_change = prev_dist_list[id_] - dist
-            if dist_change > 0:
-                step_reward += 1
-            else:
-                step_reward -= 5
-                
-            # step_reward = 0.5 * (prev_dist_list[id_] - dist)
-            # input("debug step...")
-
-
-            reward[id_] += step_reward
-
-
-            # reward[id_] -= 0.025*(abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1]))
+            # reward -= 0.025*(abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1]))
             if np.math.hypot(self.robot[id_][0]-end[id_][0], self.robot[id_][1]-end[id_][1])<1:
                 reward[id_] += 30
-                done[id_] = True
-                # input("wait..")
-                print("reach_goal!!!")
-                reward[id_] += 0.25 *  (expected_length - self.steps) ** 2
 
+                reward[id_] += 5 * (20 - self.steps) ** 2
+
+                done[id_] = True
             # if np.math.hypot(self.robot[id_][0]-self.target[id_][2], self.robot[id_][1]-self.target[id_][3]) < 1 and np.math.hypot(self.target[id_][0]-self.target[id_][2], self.target[id_][1]-self.target[id_][3]) < 1:
             #     reward[id_] += 35
             #     done[id_] = True
-
-            # print("step reward", step_reward, "reward", reward[0])
-        
         return reward, np.array(states), done, {}
     
     def simple_state(self, index, test=False):
@@ -317,6 +280,93 @@ class Simulator:
                     state[6] = 1
         return state
 
+    def step_test(self, action, simple=False, save_gif=None):
+        path = {}
+        reward = np.array([0 for i in range(self.robot_num)])
+        done = [False for i in range(self.robot_num)]
+        states = []
+        end = {}
+
+        if self.args.penalty_only:
+            gain = 0.2
+            loss = 1
+        else:
+            gain = 0.4
+            loss = 0.2
+
+
+        for id_, pos in self.robot.items():
+            pos2 = self.target[pos[2]]
+            end[id_] = (pos2[0], pos2[1])
+            if len(action) < id_+1:
+                action.append(0)
+            if (pos[0]-pos2[0])**2 + (pos[1]-pos2[1])**2 < 1:
+                self.robot_carry[id_] = True
+                end[id_] = (pos2[2], pos2[3])
+            if action[id_] == 0:
+                path[id_] = [(pos[0], pos[1])]
+                reward[id_] -= loss
+            elif action[id_] == 1:
+                path[id_] = [(pos[0], pos[1]+1)]
+                if end[id_][1] - pos[1] > 0:
+                    reward[id_] += gain
+                else:
+                     reward[id_] -= loss
+            elif action[id_] == 2:
+                path[id_] = [(pos[0]-1, pos[1])]
+                if end[id_][0] - pos[0] < 0:
+                    reward[id_] += gain
+                else:
+                     reward[id_] -= loss
+            elif action[id_] == 3:
+                path[id_] = [(pos[0]+1, pos[1])]
+                if end[id_][0] - pos[0] > 0:
+                    reward[id_] += gain
+                else:
+                     reward[id_] -= loss
+            elif action[id_] == 4:
+                path[id_] = [(pos[0], pos[1]-1)]
+                if end[id_][1] - pos[1] < 0:
+                    reward[id_] += gain
+                else:
+                     reward[id_] -= loss
+            if self.out_of_map(path[id_][0], self.size):
+                reward[id_] -= 20
+                done[id_] = True
+            if self.steps > 20:
+                reward[id_] -= 10
+                done[id_] = True
+        self.steps += 1
+        self.start(path, None, False)
+        if len(self.crash) > 0:
+            for i in self.crash:
+                reward[i[0]] -= 20
+                reward[i[1]] -= 20
+                done[i[0]] = True
+                done[i[1]] = True
+
+        # Post Step
+        for id_ in self.robot.keys():
+            if simple == False:
+                state = self.get_state_map(id_, False)
+            else:
+                state = self.simple_state(id_, True)
+            states.append(state)
+            # reward -= 0.025*(abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1]))
+            # if np.math.hypot(self.robot[id_][0]-end[id_][0], self.robot[id_][1]-end[id_][1])<1:
+            #     reward[id_] += 30
+            #     done[id_] = True
+            if np.math.hypot(self.robot[id_][0]-self.target[self.robot[id_][2]][2], self.robot[id_][1]-self.target[self.robot[id_][2]][3]) < 1 and np.math.hypot(self.target[id_][0]-self.target[id_][2], self.target[id_][1]-self.target[id_][3]) < 1:
+                reward[id_] += 35
+
+                reward[id_] += 5 * (20 - self.steps) ** 2
+                done[id_] = True
+        if save_gif!=None:
+            with imageio.get_writer("./image/"+save_gif, mode="I") as writer:
+                for idx, frame in enumerate(self.frames):
+                    writer.append_data(frame)
+        return reward, np.array(states), done, {}
+    
     def reset(self, simple=False):
         self.crash = []
         self.canvas = np.ones(self.size, np.uint8)*255
