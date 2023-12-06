@@ -29,9 +29,9 @@ if __name__ == "__main__":
     # use double dqn
     parser.add_argument("--use_double_net", default=True, type=bool)
     # exploration fraction
-    parser.add_argument("--exploration_fraction", default=0.7, type=int)
+    parser.add_argument("--exploration_fraction", default=0.9, type=int)  # 0.7
     # random exploration init ratio
-    parser.add_argument("--init_ratio", default=0.7, type=float)
+    parser.add_argument("--init_ratio", default=0.8, type=float)  # 0.7
     # random exploration final ratio
     parser.add_argument("--final_ratio", default=0.1, type=float)
     # max time steps
@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     num_robots = 3
     actions_per_robot = 5
-    env = Simulator((450,450,3),num_robots)  # 601
+    env = Simulator((300,300,3),num_robots)  # 601
     observation_per_robot = env.observation_per_robot
     model = dqn_agent(env, actions_per_robot*num_robots , observation_per_robot*num_robots,args)
     if args.load_model:

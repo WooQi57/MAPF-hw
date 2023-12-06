@@ -92,7 +92,7 @@ class dqn_agent:
         self.model_path = os.path.join(self.args.save_dir, self.args.env_name)
         if not os.path.exists(self.model_path):
             os.mkdir(self.model_path)
-        episode_reward = reward_recoder(1)  #wqwqwq episode_reward = reward_recoder(self.env.robot_num)
+        episode_reward = reward_recoder(self.env.robot_num)
         obs = self.env.reset()
         td_loss = 0
         for timestep in range(int(self.args.total_timesteps)):
@@ -101,7 +101,7 @@ class dqn_agent:
                 obs_tensor = self._get_tensors(obs)
                 action_value = self.net(obs_tensor)
             action = select_action(action_value, explore_eps)
-            reward, obs_, done, _ = self.env.step(action)  # not True
+            reward, obs_, done, _ = self.env.step(action)
             # print("get reward: ",reward)
 
             for i in range(len(obs)):
@@ -111,7 +111,7 @@ class dqn_agent:
             obs = obs_ # not 0
             
             if done:
-                obs = np.array(self.env.reset())  # not true
+                obs = np.array(self.env.reset())
                 writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
                 writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
                 writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)

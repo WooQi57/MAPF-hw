@@ -220,6 +220,7 @@ class Simulator:
         return [np.array(obs).ravel()]
     
     def compute_reward(self,action,collision,out_bound,reached_goal):
+        # print(f"action:{action}")
         reward = np.zeros(self.robot_num)
         for id_, pos in self.robot.items():
             # reward for correct action
@@ -228,7 +229,7 @@ class Simulator:
                 if action[id_] == 0:
                     reward[id_] += 2
             if action[id_] == 0:  # stay
-                reward[id_] -= 0.5
+                reward[id_] -= 2
             elif action[id_] == 1:  # down
                 reward[id_] += -1 + (target_pos[1] - pos[1] > 0) * 2
             elif action[id_] == 2:  # left
@@ -237,14 +238,15 @@ class Simulator:
                 reward[id_] += -1 + (target_pos[0] - pos[0] > 0) * 2
             elif action[id_] == 4:  # up
                 reward[id_] += -1 + (target_pos[1] - pos[1] < 0) * 2
-
+            # print(f"reward after action check:{reward}")
             # reward for goal
             if reached_goal[id_]:
                 # print(f"robot {id_} reached the goal and gets rewards")
                 reward[id_]+=10
             else:
-                reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8
-            
+                reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/(self.size[0]//scale) + 8
+
+            # print(f"after reward for goal:{reward} {(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))}")
             # reward for collision and out of map
             if collision[id_] or out_bound[id_]:
                 reward[id_] -= 50
