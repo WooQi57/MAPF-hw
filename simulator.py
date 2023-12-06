@@ -235,14 +235,14 @@ class Simulator:
                     reward[id_] += 3
             if action[id_] == 0:  # stay
                 reward[id_] -= 2
-            elif action[id_] == 1:  # down
-                reward[id_] += -1 + (target_pos[1] - prev_pos[1] > 0) * 2
-            elif action[id_] == 2:  # left
-                reward[id_] += -1 + (target_pos[0] - prev_pos[0] < 0) * 2
-            elif action[id_] == 3:  # right
-                reward[id_] += -1 + (target_pos[0] - prev_pos[0] > 0) * 2
-            elif action[id_] == 4:  # up
-                reward[id_] += -1 + (target_pos[1] - prev_pos[1] < 0) * 2
+            # elif action[id_] == 1:  # down
+            #     reward[id_] += -1 + (target_pos[1] - prev_pos[1] > 0) * 2
+            # elif action[id_] == 2:  # left
+            #     reward[id_] += -1 + (target_pos[0] - prev_pos[0] < 0) * 2
+            # elif action[id_] == 3:  # right
+            #     reward[id_] += -1 + (target_pos[0] - prev_pos[0] > 0) * 2
+            # elif action[id_] == 4:  # up
+            #     reward[id_] += -1 + (target_pos[1] - prev_pos[1] < 0) * 2
             
             if self.debug:
                 print(f"reward after action check:{reward}")

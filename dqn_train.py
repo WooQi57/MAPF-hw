@@ -42,11 +42,15 @@ if __name__ == "__main__":
     parser.add_argument("--display_interval", default=5_000, type=int)
     # load model to continue
     parser.add_argument("--load_model", default=False, type=bool)
+    # number of robots
+    parser.add_argument("--num_robots", default=3, type=int)
+    # map size
+    parser.add_argument("--map_size", default=7, type=int)
     args = parser.parse_args()
 
-    num_robots = 3
+    num_robots = args.num_robots
     actions_per_robot = 5
-    env = Simulator((250,250,3),num_robots)  # 601
+    env = Simulator((35*args.map_size+1,35*args.map_size+1,3),num_robots)  # 601
     observation_per_robot = env.observation_per_robot
     model = dqn_agent(env, actions_per_robot*num_robots , observation_per_robot*num_robots,args)
     if args.load_model:
