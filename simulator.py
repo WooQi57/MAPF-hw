@@ -11,7 +11,7 @@ scale = 35
 
 class Simulator:
 
-    def __init__(self, size, robot_num, static=None, visual=False, name =''):
+    def __init__(self, size, robot_num, static=None, visual=False, debug=False, name =''):
         """
         Initialize simulator multi agent path finding
         robot: {index:(x,y,carry_index)}
@@ -34,6 +34,7 @@ class Simulator:
         self.crash = []
         self.generate_map(robot_num, size)    
         self.visual = visual
+        self.debug = debug
         # cv2.namedWindow("Factory")
         # cv2.resizeWindow('Factory', tuple(np.array(list(size)[:2])+np.array([500,200])))
     
@@ -192,16 +193,16 @@ class Simulator:
 
         # check collision between robots
         collision = self.collision_check(next_pos)
-        done = np.array(collision).any() or np.array(out_bound).any()
+        done = np.array(collision).any()# or np.array(out_bound).any()  # wqwqwq
 
         obs = self.compute_obs(collision,out_bound,reached_goal)
         reward = self.compute_reward(action,collision,out_bound,reached_goal)
         self.steps += 1
-        if self.steps > 80:
+        if self.steps > 80/2:
                 done = True
 
         if self.visual:
-            self.show_plot(next_pos, done, None, wait=False)
+            self.show_plot(next_pos, done, None, wait=self.debug)
         return reward, np.array(obs), done, {}
     
     def compute_obs(self,collision,out_bound,reached_goal):
@@ -211,16 +212,16 @@ class Simulator:
             state[:2] = self.target[id_]
             state[2:4] = pos[:2]
             state[4] = int(collision[id_])
-            state[5] = np.min([abs(pos[0]),abs(pos[0]-self.size[0]),abs(pos[1]-0),abs(pos[1]-self.size[1]//scale)])
-            state[6] = np.linalg.norm(np.array(self.target[id_])-np.array(pos[:2]))
-
-
-            # state = self.simple_state(id_, False)
+            state[5] = np.min([pos[0],-pos[0]+self.size[0]//scale,pos[1],-pos[1]+self.size[1]//scale])
+            state[6] = abs(self.target[id_][0] - pos[0])+abs(self.target[id_][1] - pos[1])
             obs.append(state)
+        if self.debug:
+            print(f"state: {obs}")
         return [np.array(obs).ravel()]
     
     def compute_reward(self,action,collision,out_bound,reached_goal):
-        # print(f"action:{action}")
+        if self.debug:
+            print(f"action:{action}")
         reward = np.zeros(self.robot_num)
         for id_, pos in self.robot.items():
             # reward for correct action
@@ -238,7 +239,9 @@ class Simulator:
                 reward[id_] += -1 + (target_pos[0] - pos[0] > 0) * 2
             elif action[id_] == 4:  # up
                 reward[id_] += -1 + (target_pos[1] - pos[1] < 0) * 2
-            # print(f"reward after action check:{reward}")
+            
+            if self.debug:
+                print(f"reward after action check:{reward}")
             # reward for goal
             if reached_goal[id_]:
                 # print(f"robot {id_} reached the goal and gets rewards")
@@ -246,10 +249,11 @@ class Simulator:
             else:
                 reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/(self.size[0]//scale) + 8
 
-            # print(f"after reward for goal:{reward} {(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))}")
+            if self.debug:
+                print(f"after reward for goal:{reward} {(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))}")
             # reward for collision and out of map
             if collision[id_] or out_bound[id_]:
-                reward[id_] -= 50
+                reward[id_] -= 5
 
         return reward
 

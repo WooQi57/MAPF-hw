@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     num_robots = 3
     actions_per_robot = 5
-    env = Simulator((300,300,3),num_robots)  # 601
+    env = Simulator((250,250,3),num_robots)  # 601
     observation_per_robot = env.observation_per_robot
     model = dqn_agent(env, actions_per_robot*num_robots , observation_per_robot*num_robots,args)
     if args.load_model:

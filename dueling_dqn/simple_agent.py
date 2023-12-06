@@ -92,7 +92,7 @@ class dqn_agent:
         self.model_path = os.path.join(self.args.save_dir, self.args.env_name)
         if not os.path.exists(self.model_path):
             os.mkdir(self.model_path)
-        episode_reward = reward_recoder(self.env.robot_num)
+        episode_reward = reward_recoder(1)  # self.env.robot_num
         obs = self.env.reset()
         td_loss = 0
         for timestep in range(int(self.args.total_timesteps)):
@@ -128,8 +128,8 @@ class dqn_agent:
                 # self.target_net.load_state_dict(self.net.state_dict())
             
             if done and episode_reward.num_episodes % self.args.display_interval == 0:
-                print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}'.format(datetime.datetime.now(), timestep, episode_reward.num_episodes, \
-                        episode_reward.mean, td_loss))
+                print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}, eps: {}'.format(datetime.datetime.now(), timestep, episode_reward.num_episodes, \
+                        episode_reward.mean, td_loss, explore_eps))
                 model_name = f"/model_{episode_reward.num_episodes}.pt"
                 torch.save(self.net.state_dict(), self.model_path + model_name)
 
