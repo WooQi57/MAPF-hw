@@ -101,8 +101,13 @@ class dqn_agent:
                 obs_tensor = self._get_tensors(obs)
                 action_value = self.net(obs_tensor)
             action = select_action(action_value, explore_eps)
-            reward, obs_, done, _ = self.env.step(action)  # not True
+            # reward, obs_, done, _ = self.env.step(action)  # not True
             # print("get reward: ",reward)
+            
+            ############### new code starts ################
+            path_set = self.env.get_path_set() 
+            reward, obs_, done, _ = self.env.step(action, path_set) 
+            ############### new code ends ################
 
             for i in range(len(obs)):
                 self.buffer.add(obs[i], action[i], reward[i], obs_[i], done)
