@@ -341,10 +341,11 @@ class Simulator:
 
         # reset canvas
         self.canvas = np.ones(self.size, np.uint8)*255
-        for i in range(1,self.size[0]//scale):
-            cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.size[1]//scale-1)*scale), (0,0,0))
-        for i in range(1,self.size[1]//scale):
-            cv2.line(self.canvas, (scale,i*scale), ((self.size[0]//scale-1)*scale,i*scale), (0,0,0))
+        if self.visual:
+            for i in range(1,self.size[0]//scale):
+                cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.size[1]//scale-1)*scale), (0,0,0))
+            for i in range(1,self.size[1]//scale):
+                cv2.line(self.canvas, (scale,i*scale), ((self.size[0]//scale-1)*scale,i*scale), (0,0,0))
 
         self.robot = self.init_robot.copy()
         self.target = self.init_target.copy()
