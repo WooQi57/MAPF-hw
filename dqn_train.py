@@ -39,7 +39,7 @@ if __name__ == "__main__":
     # save dir
     parser.add_argument("--save_dir", default='./models', type=str)
     # save model frequency
-    parser.add_argument("--display_interval", default=10_000, type=int)
+    parser.add_argument("--display_interval", default=5_000, type=int)
     # load model to continue
     parser.add_argument("--load_model", default=False, type=bool)
     args = parser.parse_args()

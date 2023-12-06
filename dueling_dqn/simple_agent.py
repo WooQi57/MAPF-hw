@@ -91,7 +91,7 @@ class dqn_agent:
         # set the environment folder
         from datetime import datetime
         current_time = datetime.now()
-        current_time_string = current_time.strftime("%Y-%m-%d-%H-%M%S")
+        current_time_string = current_time.strftime("%Y-%m-%d-%H-%M-%S")
         self.model_path = os.path.join(self.args.save_dir, self.args.env_name+current_time_string)
         print(f"model saved in {self.model_path}")
         if not os.path.exists(self.model_path):
@@ -132,7 +132,7 @@ class dqn_agent:
                 # self.target_net.load_state_dict(self.net.state_dict())
             
             if done and episode_reward.num_episodes % self.args.display_interval == 0:
-                print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}, eps: {}'.format(datetime.datetime.now(), timestep, episode_reward.num_episodes, \
+                print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}, eps: {}'.format(datetime.now(), timestep, episode_reward.num_episodes, \
                         episode_reward.mean, td_loss, explore_eps))
                 model_name = f"/model_{episode_reward.num_episodes}.pt"
                 torch.save(self.net.state_dict(), self.model_path + model_name)
