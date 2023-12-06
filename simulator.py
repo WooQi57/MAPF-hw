@@ -4,6 +4,7 @@ import numpy as np
 from copy import deepcopy
 import imageio
 from matplotlib import pyplot as plt
+import time
 
 scale = 35
 
@@ -32,9 +33,30 @@ class Simulator:
             self.robot, self.target = static
         self.colours = self.assign_colour(robot_num*3)
         self.crash = []
+
+        # Handel the map_reset at th most begining to reproduce the later training procedure
+        rnd = np.random
+        rnd.seed(5457)
+        if len(self.robot) == 0:
+            pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
+            pos = set([tuple(i) for i in pos])
+            while len(pos) < 3*robot_num:
+                temp = rnd.randint(1,size[0]//scale, size=(3*robot_num - len(pos),2))
+                b = set([tuple(i) for i in temp])
+                for i in b:
+                    if i not in pos:
+                        pos.add(i)
+            pos = list(pos)
+
+
+        self.fix_pos = pos
+
+
         self.generate_map(robot_num, size)    
         # cv2.namedWindow("Factory")
         # cv2.resizeWindow('Factory', tuple(np.array(list(size)[:2])+np.array([500,200])))
+
+
     
     def update_pairs(self, pairs):
         for pair in pairs:
@@ -51,22 +73,39 @@ class Simulator:
             cv2.line(self.canvas, (scale*i,scale), (scale*i,(size[1]//scale-1)*scale), (0,0,0))
         for i in range(1,size[1]//scale):
             cv2.line(self.canvas, (scale,i*scale), ((size[0]//scale-1)*scale,i*scale), (0,0,0))
+        # if len(self.robot) == 0:
+        #     pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
+        #     pos = set([tuple(i) for i in pos])
+        #     while len(pos) < 3*robot_num:
+        #         temp = rnd.randint(1,size[0]//scale, size=(3*robot_num - len(pos),2))
+        #         b = set([tuple(i) for i in temp])
+        #         for i in b:
+        #             if i not in pos:
+        #                 pos.add(i)
+        #     pos = list(pos)
+        #     for i in range(robot_num):
+        #         self.robot[i] = (pos[i][0],pos[i][1],i)
+        #         self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+2*robot_num][0], pos[i+2*robot_num][1])
+        
+        # assert len(self.robot) > 0, "You should have len(self.robot) > 0"
+
         if len(self.robot) == 0:
-            pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
-            pos = set([tuple(i) for i in pos])
-            while len(pos) < 3*robot_num:
-                temp = rnd.randint(1,size[0]//scale, size=(3*robot_num - len(pos),2))
-                b = set([tuple(i) for i in temp])
-                for i in b:
-                    if i not in pos:
-                        pos.add(i)
-            pos = list(pos)
+            pos = self.fix_pos
             for i in range(robot_num):
                 self.robot[i] = (pos[i][0],pos[i][1],i)
                 self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+2*robot_num][0], pos[i+2*robot_num][1])
+
+
         for i in range(robot_num):
             self.draw_target(self.canvas, np.array(self.target[i][2:])*scale, self.colours[i+len(self.robot)], 5)
             self.robot_carry[i] = False    
+
+        # reset rnd seed for the later training portion
+
+        if self.args.reset_seed_inprocess:
+            # print("here")
+            rnd.seed(int(time.time()))
+            # exit()
 
     @staticmethod
     def assign_colour(num):
@@ -160,13 +199,13 @@ class Simulator:
         prev_dist_list = [0.0 for i in action]
 
 
-        expected_length = 2 * self.args.map_size
-        if False:
-            gain = 0.01
-            loss = 0.4
-        else:
-            gain = 0.4
-            loss = 0.2
+        # expected_length = 2 * self.args.map_size
+        # if False:
+        #     gain = 0.01
+        #     loss = 0.4
+        # else:
+        #     gain = 0.4
+        #     loss = 0.2
 
         
         gain = 0
@@ -266,12 +305,6 @@ class Simulator:
                 # input("wait..")
                 print("reach_goal!!!")
                 reward[id_] += 0.25 *  (expected_length - self.steps) ** 2
-
-            # if np.math.hypot(self.robot[id_][0]-self.target[id_][2], self.robot[id_][1]-self.target[id_][3]) < 1 and np.math.hypot(self.target[id_][0]-self.target[id_][2], self.target[id_][1]-self.target[id_][3]) < 1:
-            #     reward[id_] += 35
-            #     done[id_] = True
-
-            # print("step reward", step_reward, "reward", reward[0])
         
         return reward, np.array(states), done, {}
     

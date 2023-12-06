@@ -56,6 +56,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--map_size", default=10, type=int)
     parser.add_argument("--num_robot", default=5, type=int)
+    parser.add_argument("--reset_seed_inprocess", action='store_true', default=False)
 
 
     args = parser.parse_args()
@@ -66,7 +67,10 @@ if __name__ == "__main__":
 
     args.env_name += f"_{args.num_robot}"
 
-    # os.mkdir(f"models/{args.env_name}")
+    if args.reset_seed_inprocess:
+        args.env_name += f"_ResetSeed"
+
+
 
     print(f"args.env_name: {args.env_name}")
     print(f"args.penalty_only: {args.penalty_only}")
@@ -75,18 +79,27 @@ if __name__ == "__main__":
 
     # exit(0)
 
+    
+    assert args.num_robot > 1, "should assign num_robot > 1"
+
 
     # env = Simulator((args.map_size*35+1,args.map_size*35+1,3), 5, args=args)
     env = Simulator((args.map_size*35+1,args.map_size*35+1,3), args.num_robot, args=args)
 
     model = dqn_agent(env, args)
     if args.load_model:
-        model_path = os.path.join(args.save_dir, "MAPF_Prior/model_304000_231_30.pt")
+        model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4/M_10x10_1205_143329/model_E_653000_R_27_L_6.pt"
+        # model_path = os.path.join(args.save_dir, "MAPF_Prior/model_304000_231_30.pt")
         model.load_dict(model_path)
     model.learn_one()
 
 
 
 """
-python dqn_train_v3_Multi.py --ssh 1 --env_name MAPF_Static --map_size 10 --num_robot 4 > dqn_train_v3_Multi.txt
+python dqn_train_v3_Multi.py --ssh 1 --env_name MAPF_Static --map_size 10 --num_robot 4 > txt_log/v3_Multi_10.txt
+
+
+python dqn_train_v3_Multi.py --ssh 1 --env_name MAPF_Static --map_size 10 --num_robot 4 --reset_seed_inprocess > txt_log/v3_Multi_10_RESET_tmux4.txt
+
+
 """

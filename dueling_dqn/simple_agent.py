@@ -144,6 +144,86 @@ class dqn_agent:
 
                 torch.save(self.net.state_dict(), self.model_path + model_name)
 
+
+
+
+
+    def render_one(self, random_level):
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
+        self.buffer = replay_buffer(self.args.buffer_size)
+        self.exploration_schedule = linear_schedule(int(self.args.total_timesteps * self.args.exploration_fraction), self.args.final_ratio, self.args.init_ratio)
+        
+        if not os.path.exists(self.args.save_dir):
+            os.mkdir(self.args.save_dir)
+        # set the environment folder
+        self.model_path = os.path.join(self.args.save_dir, self.args.env_name)        
+        if not os.path.exists(self.model_path):
+            os.mkdir(self.model_path)
+        episode_reward = reward_recoder(1)
+        obs = self.env.reset(True)
+        obs = [obs[0]]
+        td_loss = 0
+
+
+        sub_folder = f"M_{self.args.map_size}x{self.args.map_size}_{str(self.timestamp)}"
+        self.model_path = os.path.join(self.model_path, sub_folder)
+        
+        for timestep in range(int(self.args.total_timesteps)):
+            # explore_eps = self.exploration_schedule.get_value(timestep)
+
+            explore_eps = random_level # 0 or 0.1
+
+
+            with torch.no_grad():
+                obs_tensor = self._get_tensors(obs)
+                action_value = self.net(obs_tensor)
+            action = select_action(action_value, explore_eps)
+            action = [action]
+            action.extend([0 for i in range(self.env.robot_num-1)])
+            reward, obs_, done, _ = self.env.step(action, True)
+            # print("get reward: ",reward)
+
+            for i in range(len(obs)):
+                self.buffer.add(obs[i], action[i], reward[i], obs_[i], float(done[i]))
+                episode_reward.add_reward(reward[i],i)
+                # print("state: ", obs[i], "action: ",action[i],"reward: ", reward[i])
+            obs = [obs_[0]]
+            
+            done = np.array(done).any()
+            if done:
+                obs = np.array(self.env.reset(True))
+                obs = [obs[0]]
+                writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
+                writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
+                writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
+                episode_reward.start_new_episode() 
+
+                print(f"latest reward: {episode_reward.latest[0]}, {explore_eps}, mean reward: {episode_reward.mean}")
+            
+            # if timestep > self.args.learning_starts and timestep % self.args.train_freq == 0:
+            #     batch_sample = self.buffer.sample(self.args.bath_size)
+            #     td_loss = self._update_network(batch_sample)
+            #     writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
+                
+            # if timestep > self.args.learning_starts and timestep % self.args.target_network_update_freq == 0:
+            #     for param, target_param in zip(self.net.parameters(), self.target_net.parameters()):
+            #         target_param.data.copy_(self.args.tau * param.data + (1 - self.args.tau) * target_param.data)
+            #     # self.target_net.load_state_dict(self.net.state_dict())
+            
+            # if done and episode_reward.num_episodes % self.args.display_interval == 0:
+            #     print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}'.format(datetime.datetime.now(), timestep, episode_reward.num_episodes, \
+            #             episode_reward.mean, td_loss))
+                
+            #     model_name = f"/model_E_{episode_reward.num_episodes}_R_{round(episode_reward.mean)}_L_{round(td_loss)}.pt"
+                
+            #     if not os.path.exists(self.model_path):
+            #         os.mkdir(self.model_path)
+            #     model_name = os.path.join(self.model_path, model_name)
+
+            #     torch.save(self.net.state_dict(), self.model_path + model_name)
+
+
+
     def load_dict(self, path):
         state_dict = torch.load(path)
         self.net.load_state_dict(state_dict)

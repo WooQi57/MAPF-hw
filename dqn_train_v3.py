@@ -55,12 +55,20 @@ if __name__ == "__main__":
     parser.add_argument("--penalty_only", default=False, type=bool)
 
     parser.add_argument("--map_size", default=10, type=int)
+    parser.add_argument("--num_robot", default=1, type=int)
+
+    parser.add_argument("--reset_seed_inprocess", action='store_true', default=False)
+
+
 
 
     args = parser.parse_args()
 
 
     timestamp = datetime.datetime.now().strftime("%m%d_%H%M%S")
+
+    if args.reset_seed_inprocess:
+        args.env_name += f"_ResetSeed"
         
 
     # args.env_name += f"_{args.map_size}x{args.map_size}_{str(timestamp)}"
@@ -74,13 +82,15 @@ if __name__ == "__main__":
 
     # exit(0)
 
+    assert args.num_robot == 1
 
     # env = Simulator((args.map_size*35+1,args.map_size*35+1,3), 5, args=args)
     env = Simulator((args.map_size*35+1,args.map_size*35+1,3), 1, args=args)
 
     model = dqn_agent(env, args)
     if args.load_model:
-        model_path = os.path.join(args.save_dir, "MAPF_Prior/model_304000_231_30.pt")
+        model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF/M_10x10_1205_140322/model_E_747000_R_90_L_6.pt"
+        # model_path = os.path.join(args.save_dir, "MAPF_Prior/model_304000_231_30.pt")
         model.load_dict(model_path)
         # model.load_dict(model_path+"/../MAPF_Prior/model_249000_231_0.pt")
 
@@ -93,3 +103,12 @@ if __name__ == "__main__":
         # model.load_dict(model_path+"/../MAPF_Prior/model1804.689453125.pt")
 
     model.learn_one()
+
+
+"""
+python dqn_train_v3.py --ssh 1 --map_size 10 > txt_log/v3_single_10.txt
+
+python dqn_train_v3.py --ssh 1 --map_size 10 --reset_seed_inprocess > txt_log/v3_single_10_RESET_tmux3.txt
+
+
+"""
