@@ -199,7 +199,7 @@ class Simulator:
         prev_dist_list = [0.0 for i in action]
 
 
-        # expected_length = 2 * self.args.map_size
+        expected_length = 2 * self.args.map_size
         # if False:
         #     gain = 0.01
         #     loss = 0.4
@@ -303,7 +303,7 @@ class Simulator:
                 reward[id_] += 30
                 done[id_] = True
                 # input("wait..")
-                print("reach_goal!!!")
+                # print("reach_goal!!!")
                 reward[id_] += 0.25 *  (expected_length - self.steps) ** 2
         
         return reward, np.array(states), done, {}
