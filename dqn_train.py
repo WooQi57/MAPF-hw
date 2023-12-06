@@ -35,11 +35,11 @@ if __name__ == "__main__":
     # random exploration final ratio
     parser.add_argument("--final_ratio", default=0.1, type=float)
     # max time steps
-    parser.add_argument("--total_timesteps", default=5e5, type=int)  #5e5
+    parser.add_argument("--total_timesteps", default=5e6, type=int)  #5e5
     # save dir
     parser.add_argument("--save_dir", default='./models', type=str)
     # save model frequency
-    parser.add_argument("--display_interval", default=2000, type=int)
+    parser.add_argument("--display_interval", default=10_000, type=int)
     # load model to continue
     parser.add_argument("--load_model", default=False, type=bool)
     args = parser.parse_args()
