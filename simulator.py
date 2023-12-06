@@ -303,7 +303,8 @@ class Simulator:
                 reward[id_] += 30
                 done[id_] = True
                 # input("wait..")
-                # print("reach_goal!!!")
+                if self.args.moveAll:
+                    print("reach_goal!!!")
                 reward[id_] += 0.25 *  (expected_length - self.steps) ** 2
         
         return reward, np.array(states), done, {}

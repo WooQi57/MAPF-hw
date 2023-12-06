@@ -63,6 +63,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--debug", action='store_true', default=False)
 
+    parser.add_argument("--moveAll", action='store_true', default=False)
+
+
 
 
     args = parser.parse_args()
@@ -72,6 +75,10 @@ if __name__ == "__main__":
     print(f"args.env_name: {args.env_name}")
     print(f"args.penalty_only: {args.penalty_only}")
     print(f"args.load_model: {args.load_model}")
+
+
+
+    model_path = ""
 
 
     args.num_robot=1
@@ -84,15 +91,41 @@ if __name__ == "__main__":
 
     args.num_robot=4
 
+    # RESET SEED TO 5457 at every time ...
     # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4/M_10x10_1205_182846/model_E_582000_R_74_L_2.pt"
-    model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4/M_10x10_1205_182846/model_E_574000_R_74_L_5.pt"
+    # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4/M_10x10_1205_182846/model_E_574000_R_74_L_5.pt"
+    # model_path=  "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4/M_10x10_1205_182846/model_E_159000_R_33_L_4.pet"
+
+    # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4/M_10x10_1206_000841/model_E_62000_R_8_L_58.pt"
 
     # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4_ResetSeed/M_10x10_1205_184623/model_E_574000_R_79_L_7.pt"
+    # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/OLD_MAPF_Static_4_32_20000/M_10x10_1205_165856/model_E_123000_R_40_L_1.pt"
 
 
 
 
-    env = Simulator((args.map_size*35+1,args.map_size*35+1,1), args.num_robot, args=args)
+    ## LATEST SEED
+    # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4/M_10x10_1206_000841/model_E_554000_R_76_L_3.pt"
+
+    
+    if model_path != "":
+        assert (not args.moveAll), "args.moveAll:"
+
+
+    ### ALL MOVE TOGETHER:
+    if args.moveAll:
+
+        # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models_prior/MAPF_Dynamic_4/M_10x10/AllMove_4/model_E_962000_R_12_L_0.pt"
+        # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models_prior/MAPF_Dynamic_4/M_10x10/AllMove_4/model_E_966000_R_11_L_9.pt"
+
+        model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models_prior/MAPF_Dynamic_4/M_10x10/AllMove_4_SameSeed/model_E_928000_R_9_L_0.pt"
+        # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models_prior/MAPF_Dynamic_4/M_10x10/AllMove_4_SameSeed/model_E_929000_R_8_L_1.pt"
+
+    assert model_path != "", "model_path != 0"
+
+
+
+    env = Simulator((args.map_size*35+1,args.map_size*35+1,3), args.num_robot, args=args)
     model = dqn_agent(env, args)
     if args.load_model:
         model.load_dict(model_path)
@@ -101,4 +134,9 @@ if __name__ == "__main__":
         exit(0)
     # model.learn_one()
 
-    model.render_one(random_level=0)
+    if args.moveAll:
+        model.render(random_level=0.1)
+    else:
+        model.render_one(random_level=0.1)
+
+
