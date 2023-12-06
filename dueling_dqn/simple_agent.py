@@ -13,6 +13,7 @@ index = len(os.listdir(log_dir))
 log_path = './dueling_dqn/logs/log'+str(index)
 print(f"writing log in {log_path}")
 writer = SummaryWriter(log_path)
+torch.set_default_device('cuda')
 
 class dqn_agent:
     def __init__(self, env, num_actions, num_observation ,args):
@@ -23,8 +24,10 @@ class dqn_agent:
         self.target_net.load_state_dict(self.net.state_dict())
         
         if self.args.cuda:
+            print(f"cuda available: {torch.cuda.is_available()}")
             self.net.cuda()
             self.target_net.cuda()
+
         
     def learn(self):
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)

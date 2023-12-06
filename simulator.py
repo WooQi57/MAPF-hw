@@ -48,6 +48,7 @@ class Simulator:
         rnd = np.random
         rnd.seed(5258)
         assert size[0]*size[1]>robot_num *scale*3
+        self.canvas = np.ones(self.size, np.uint8)*255
         for i in range(1,size[0]//scale):
             cv2.line(self.canvas, (scale*i,scale), (scale*i,(size[1]//scale-1)*scale), (0,0,0))
         for i in range(1,size[1]//scale):
@@ -65,10 +66,12 @@ class Simulator:
             for i in range(robot_num):
                 self.robot[i] = (pos[i][0],pos[i][1],i)
                 self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1])
+        self.init_robot = self.robot.copy()
+        self.init_target = self.target.copy()
+            
         # for i in range(robot_num):
         #     self.draw_target(self.canvas, np.array(self.target[i][2:])*scale, self.colours[i+len(self.robot)], 5)
         #     self.robot_carry[i] = False   
-        rnd.seed(int(time.time())) 
 
     @staticmethod
     def assign_colour(num):
@@ -237,7 +240,7 @@ class Simulator:
 
             # reward for goal
             if reached_goal[id_]:
-                print(f"robot {id_} reached the goal and gets rewards")
+                # print(f"robot {id_} reached the goal and gets rewards")
                 reward[id_]+=10
             else:
                 reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8
@@ -317,14 +320,23 @@ class Simulator:
 
     def reset(self):
         self.crash = []
-        self.canvas = np.ones(self.size, np.uint8)*255
         self.robot = {}
         self.robot_carry = {}
         self.target = {}
         self.steps = 0
         states = []
         self.frames = []
-        self.generate_map(self.robot_num, self.size)
+        # self.generate_map(self.robot_num, self.size)
+
+        # reset canvas
+        self.canvas = np.ones(self.size, np.uint8)*255
+        for i in range(1,self.size[0]//scale):
+            cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.size[1]//scale-1)*scale), (0,0,0))
+        for i in range(1,self.size[1]//scale):
+            cv2.line(self.canvas, (scale,i*scale), ((self.size[0]//scale-1)*scale,i*scale), (0,0,0))
+
+        self.robot = self.init_robot.copy()
+        self.target = self.init_target.copy()
         for id_ in self.robot.keys():
             state = np.zeros(self.observation_per_robot)
             states.append(state)

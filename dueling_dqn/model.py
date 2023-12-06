@@ -2,6 +2,7 @@ from os import stat
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+torch.set_default_device('cuda')
 
 # the convolution layer of deepmind
 class deepmind(nn.Module):
