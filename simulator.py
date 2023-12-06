@@ -201,7 +201,7 @@ class Simulator:
         obs = self.compute_obs(collision,out_bound,reached_goal)
         reward = self.compute_reward(action,collision,out_bound,reached_goal)
         self.steps += 1
-        if self.steps > 80/2:
+        if self.steps > 80/4:
                 done = True
 
         if self.visual:
