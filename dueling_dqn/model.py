@@ -56,13 +56,13 @@ class net(nn.Module):
         return action_value_out
 
 class simplenet(nn.Module):
-    def __init__(self, num_actions):
+    def __init__(self, num_actions, num_observation):
         super(simplenet, self).__init__()
-        self.linear1 = nn.Linear(2+num_actions, 2+num_actions)
-        self.state_value_fc = nn.Linear(2+num_actions, 2+num_actions)
-        self.action_fc = nn.Linear(2+num_actions, 2+num_actions)
-        self.action_value = nn.Linear(2+num_actions, num_actions)
-        self.state_value = nn.Linear(2+num_actions, 1)
+        self.linear1 = nn.Linear(num_observation, 2+num_observation)
+        self.state_value_fc = nn.Linear(2+num_observation, 2+num_observation)
+        self.action_fc = nn.Linear(2+num_observation, 2+num_observation)
+        self.action_value = nn.Linear(2+num_observation, num_actions)
+        self.state_value = nn.Linear(2+num_observation, 1)
         nn.init.normal_(self.linear1.weight, mean=0., std=0.1)
         nn.init.constant_(self.linear1.bias, 0.)
         nn.init.normal_(self.state_value_fc.weight, mean=0., std=0.1)

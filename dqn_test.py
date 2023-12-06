@@ -3,9 +3,9 @@ import os
 import torch
 import numpy as np
 from dueling_dqn.simple_agent import dqn_agent
-from dueling_dqn import utils
 from simulator import Simulator
 from allocate import get_allocate_matrix
+from dueling_dqn.utils import linear_schedule, replay_buffer, reward_recoder, select_action, set_init
 
 def target_policy(state):
     prob = np.ones(5)/100
@@ -46,27 +46,29 @@ def main():
     parser.add_argument("--save_dir", default='./models', type=str)
     args = parser.parse_args()
 
-    env = Simulator((601,601,3),1)
-    robots, targets = env.information()
-    pairs = get_allocate_matrix(robots, targets)
-    env.update_pairs(pairs)
-    model = dqn_agent(env, args)
+    num_robots = 3
+    actions_per_robot = 5
+    env = Simulator((450,450,3),num_robots,visual=True)  # 601
+    observation_per_robot = env.observation_per_robot
+    model = dqn_agent(env, actions_per_robot*num_robots , observation_per_robot*num_robots,args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"\model0.17251485586166382.pt")
-    obs = env.reset(True)
-    obs = [obs[0]]
+        model.load_dict(model_path+"\model_7000.pt")
+
+    obs = env.reset()
     done = False
-    while not done:
+    td_loss = 0
+    while True:
         with torch.no_grad():
             obs_tensor = model._get_tensors(obs)
             action_value = model.net(obs_tensor)
-        action = utils.select_action(action_value, 0.1)
-        if type(action) == np.int64 or type(action) == int:
-            action = [action]
-        reward, obs_, done, _ = env.step_test(action, True, "single_DQN_test.gif")
-        obs = [obs_[0]]
-        done = np.array(done).any()
+        action = select_action(action_value, 0.1)
+        reward, obs, done, _ = env.step(action)
+        print("get reward: ",reward)
+
+        if done:
+            obs = np.array(env.reset())  # not true
+
 
 def main2():
     parser = argparse.ArgumentParser()
@@ -107,4 +109,4 @@ def main2():
         done = np.array(done).all()
 
 if __name__ =="__main__":
-    main2()
+    main()

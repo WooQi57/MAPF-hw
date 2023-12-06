@@ -37,7 +37,8 @@ class dqn_agent:
         obs = self.env.reset()
         td_loss = 0
         for timestep in range(int(self.args.total_timesteps)):
-            explore_eps = self.exploration_schedule.get_value(timestep)
+            # explore_eps = self.exploration_schedule.get_value(timestep)
+            explore_eps = 0.2
             with torch.no_grad():
                 obs_tensor = self._get_tensors(obs)
                 action_value = self.net(obs_tensor)
@@ -47,12 +48,13 @@ class dqn_agent:
             reward, obs_, done, _ = self.env.step(action)
 
             for i in range(len(obs)):
-                self.buffer.add(obs[i], action[i], reward[i], obs_[i], float(done[i]))
+                self.buffer.add(obs[i], action[i], reward[i], obs_[i], float(done))
                 episode_reward.add_reward(reward[i],i)
             obs = obs_
             
-            done = np.array(done).any()
+            # done = np.array(done).any()
             if done:
+                print(f"done at {timestep}")
                 obs = np.array(self.env.reset())
                 writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
                 writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
@@ -74,6 +76,58 @@ class dqn_agent:
                         episode_reward.mean, td_loss))
                 torch.save(self.net.state_dict(), self.model_path + '/model'+str(td_loss)+'.pt')
     
+    def load_dict(self, path):
+        state_dict = torch.load(path)
+        self.net.load_state_dict(state_dict)
+        print("load successful")
+    
+    def _update_network(self, samples):
+        obses, actions, rewards, obses_next, dones = samples
+        # convert the data to tensor
+        obses = self._get_tensors(obses)
+        actions = torch.tensor(actions, dtype=torch.int64).unsqueeze(-1)
+        rewards = torch.tensor(rewards, dtype=torch.float32).unsqueeze(-1)
+        obses_next = self._get_tensors(obses_next)
+        dones = torch.tensor(1 - dones, dtype=torch.float32).unsqueeze(-1)
+        # convert into gpu
+        if self.args.cuda:
+            actions = actions.cuda()
+            rewards = rewards.cuda()
+            dones = dones.cuda()
+        # calculate the target value
+        with torch.no_grad():
+            # if use the double network architecture
+            if self.args.use_double_net:
+                q_value_ = self.net(obses_next)
+                action_max_idx = torch.argmax(q_value_, dim=1, keepdim=True)
+                target_action_value = self.target_net(obses_next)
+                target_action_max_value = target_action_value.gather(1, action_max_idx)
+            else:
+                target_action_value = self.target_net(obses_next)
+                target_action_max_value, _ = torch.max(target_action_value, dim=1, keepdim=True)
+        # target
+        expected_value = rewards + self.args.gamma * target_action_max_value * dones
+        # get the real q value
+        action_value = self.net(obses)
+        real_value = action_value.gather(1, actions)
+        loss = (expected_value - real_value).pow(2).mean()
+        # start to update
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
+    
+    def _get_tensors(self, obs):
+        # if obs.ndim == 3:
+        #     obs = np.transpose(obs, (2, 0, 1))
+        #     obs = np.expand_dims(obs, 0)
+        # elif obs.ndim == 4:
+        #     obs = np.transpose(obs, (0, 3, 1, 2))
+        obs = torch.tensor(obs, dtype=torch.float32)
+        if self.args.cuda:
+            obs = obs.cuda()
+        return obs
+
     def learn_one(self):
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
         self.buffer = replay_buffer(self.args.buffer_size)
@@ -128,55 +182,3 @@ class dqn_agent:
                 print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}'.format(datetime.datetime.now(), timestep, episode_reward.num_episodes, \
                         episode_reward.mean, td_loss))
                 torch.save(self.net.state_dict(), self.model_path + '/model'+str(td_loss)+'.pt')
-
-    def load_dict(self, path):
-        state_dict = torch.load(path)
-        self.net.load_state_dict(state_dict)
-        print("load successful")
-    
-    def _update_network(self, samples):
-        obses, actions, rewards, obses_next, dones = samples
-        # convert the data to tensor
-        obses = self._get_tensors(obses)
-        actions = torch.tensor(actions, dtype=torch.int64).unsqueeze(-1)
-        rewards = torch.tensor(rewards, dtype=torch.float32).unsqueeze(-1)
-        obses_next = self._get_tensors(obses_next)
-        dones = torch.tensor(1 - dones, dtype=torch.float32).unsqueeze(-1)
-        # convert into gpu
-        if self.args.cuda:
-            actions = actions.cuda()
-            rewards = rewards.cuda()
-            dones = dones.cuda()
-        # calculate the target value
-        with torch.no_grad():
-            # if use the double network architecture
-            if self.args.use_double_net:
-                q_value_ = self.net(obses_next)
-                action_max_idx = torch.argmax(q_value_, dim=1, keepdim=True)
-                target_action_value = self.target_net(obses_next)
-                target_action_max_value = target_action_value.gather(1, action_max_idx)
-            else:
-                target_action_value = self.target_net(obses_next)
-                target_action_max_value, _ = torch.max(target_action_value, dim=1, keepdim=True)
-        # target
-        expected_value = rewards + self.args.gamma * target_action_max_value * dones
-        # get the real q value
-        action_value = self.net(obses)
-        real_value = action_value.gather(1, actions)
-        loss = (expected_value - real_value).pow(2).mean()
-        # start to update
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        return loss.item()
-    
-    def _get_tensors(self, obs):
-        # if obs.ndim == 3:
-        #     obs = np.transpose(obs, (2, 0, 1))
-        #     obs = np.expand_dims(obs, 0)
-        # elif obs.ndim == 4:
-        #     obs = np.transpose(obs, (0, 3, 1, 2))
-        obs = torch.tensor(obs, dtype=torch.float32)
-        if self.args.cuda:
-            obs = obs.cuda()
-        return obs

@@ -8,12 +8,16 @@ from torch.utils.tensorboard import SummaryWriter
 from dueling_dqn.utils import linear_schedule, replay_buffer, reward_recoder, select_action, set_init
 from .model import simplenet
 
-writer = SummaryWriter('./dueling_dqn/logs')
+log_dir = './dueling_dqn/logs'
+index = len(os.listdir(log_dir))
+log_path = './dueling_dqn/logs/log'+str(index)
+print(f"writing log in {log_path}")
+writer = SummaryWriter(log_path)
 
 class dqn_agent:
-    def __init__(self, env, args):
+    def __init__(self, env, num_actions, num_observation ,args):
         self.env = env
-        self.net = simplenet(5)
+        self.net = simplenet(num_actions, num_observation)
         self.args = args
         self.target_net = copy.deepcopy(self.net)
         self.target_net.load_state_dict(self.net.state_dict())
@@ -85,9 +89,8 @@ class dqn_agent:
         self.model_path = os.path.join(self.args.save_dir, self.args.env_name)
         if not os.path.exists(self.model_path):
             os.mkdir(self.model_path)
-        episode_reward = reward_recoder(1)
-        obs = self.env.reset(True)
-        obs = [obs[0]]
+        episode_reward = reward_recoder(1)  #wqwqwq episode_reward = reward_recoder(self.env.robot_num)
+        obs = self.env.reset()
         td_loss = 0
         for timestep in range(int(self.args.total_timesteps)):
             explore_eps = self.exploration_schedule.get_value(timestep)
@@ -95,21 +98,17 @@ class dqn_agent:
                 obs_tensor = self._get_tensors(obs)
                 action_value = self.net(obs_tensor)
             action = select_action(action_value, explore_eps)
-            action = [action]
-            action.extend([0 for i in range(self.env.robot_num-1)])
-            reward, obs_, done, _ = self.env.step(action, True)
+            reward, obs_, done, _ = self.env.step(action)  # not True
             # print("get reward: ",reward)
 
             for i in range(len(obs)):
-                self.buffer.add(obs[i], action[i], reward[i], obs_[i], float(done[i]))
+                self.buffer.add(obs[i], action[i], reward[i], obs_[i], done)
                 episode_reward.add_reward(reward[i],i)
                 # print("state: ", obs[i], "action: ",action[i],"reward: ", reward[i])
-            obs = [obs_[0]]
+            obs = obs_ # not 0
             
-            done = np.array(done).any()
             if done:
-                obs = np.array(self.env.reset(True))
-                obs = [obs[0]]
+                obs = np.array(self.env.reset())  # not true
                 writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
                 writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
                 writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
@@ -128,7 +127,8 @@ class dqn_agent:
             if done and episode_reward.num_episodes % self.args.display_interval == 0:
                 print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}'.format(datetime.datetime.now(), timestep, episode_reward.num_episodes, \
                         episode_reward.mean, td_loss))
-                torch.save(self.net.state_dict(), self.model_path + '/model'+str(td_loss)+'.pt')
+                model_name = f"/model_{episode_reward.num_episodes}.pt"
+                torch.save(self.net.state_dict(), self.model_path + model_name)
 
     def load_dict(self, path):
         state_dict = torch.load(path)
@@ -177,7 +177,7 @@ class dqn_agent:
         #     obs = np.expand_dims(obs, 0)
         # elif obs.ndim == 4:
         #     obs = np.transpose(obs, (0, 3, 1, 2))
-        obs = torch.tensor(obs, dtype=torch.float32)
+        obs = torch.tensor(np.array(obs), dtype=torch.float32)
         if self.args.cuda:
             obs = obs.cuda()
         return obs

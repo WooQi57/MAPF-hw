@@ -19,21 +19,36 @@ class linear_schedule:
         frac = min(float(timestep) / self.total_timesteps, 1.0)
         return self.init_ratio - frac * (self.init_ratio - self.final_ratio)
     
+# def select_action(action_value, explore_eps):
+#     action_value = action_value.cpu().numpy().squeeze()
+#     if random.random() > explore_eps:
+#         # print("stick to the plan")
+#         try:
+#             action = np.argmax(action_value, axis=1)  
+#         except:
+#             action = np.argmax(action_value, axis=0)  
+#     else:
+#         # print("explore")
+#         try:
+#             if len(action_value) == 5 and len(action_value[0])!=5:
+#                 action = np.random.randint(0,5,(1))[0]
+#             else:
+#                 action = np.random.randint(0,5,(action_value.shape[0]))
+#         except:
+#             action = int(np.random.randint(0,5,size=(1)))
+#     # print(f"action:{action}")
+#     return action
+
 def select_action(action_value, explore_eps):
     action_value = action_value.cpu().numpy().squeeze()
+    action_value = action_value.reshape((-1,5))  # action_value is num_robots * 5
     if random.random() > explore_eps:
-        try:
-            action = np.argmax(action_value, axis=1)  
-        except:
-            action = np.argmax(action_value, axis=0)  
+        # print("stick to the plan")
+        action = np.argmax(action_value, axis=1)  
     else:
-        try:
-            if len(action_value) == 5 and len(action_value[0])!=5:
-                action = np.random.randint(0,5,(1))[0]
-            else:
-                action = np.random.randint(0,5,(action_value.shape[0]))
-        except:
-            action = int(np.random.randint(0,5,size=(1)))
+        # print("explore")
+        action = np.random.randint(0,5,len(action_value))
+    # print(f"action:{action}")
     return action
 
 class reward_recoder:
