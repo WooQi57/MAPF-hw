@@ -35,7 +35,7 @@ if __name__ == "__main__":
     # random exploration final ratio
     parser.add_argument("--final_ratio", default=0.1, type=float)
     # max time steps
-    parser.add_argument("--total_timesteps", default=5e6, type=int)  #5e5
+    parser.add_argument("--total_timesteps", default=5e7, type=int)  #5e5
     # save dir
     parser.add_argument("--save_dir", default='./models', type=str)
     # save model frequency
@@ -51,5 +51,5 @@ if __name__ == "__main__":
     model = dqn_agent(env, actions_per_robot*num_robots , observation_per_robot*num_robots,args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"/model40.983375549316406.pt")
+        model.load_dict(model_path+"/model_152000.pt")
     model.learn_one()

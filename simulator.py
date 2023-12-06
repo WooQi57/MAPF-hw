@@ -193,7 +193,7 @@ class Simulator:
 
         # check collision between robots
         collision = self.collision_check(next_pos)
-        done = np.array(collision).any()# or np.array(out_bound).any()  # wqwqwq
+        done = np.array(collision).any() or np.array(out_bound).any()  # wqwqwq
 
         obs = self.compute_obs(collision,out_bound,reached_goal)
         reward = self.compute_reward(action,collision,out_bound,reached_goal)
