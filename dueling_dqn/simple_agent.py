@@ -89,7 +89,11 @@ class dqn_agent:
         if not os.path.exists(self.args.save_dir):
             os.mkdir(self.args.save_dir)
         # set the environment folder
-        self.model_path = os.path.join(self.args.save_dir, self.args.env_name)
+        from datetime import datetime
+        current_time = datetime.now()
+        current_time_string = current_time.strftime("%Y-%m-%d-%H-%M%S")
+        self.model_path = os.path.join(self.args.save_dir, self.args.env_name+current_time_string)
+        print(f"model saved in {self.model_path}")
         if not os.path.exists(self.model_path):
             os.mkdir(self.model_path)
         episode_reward = reward_recoder(1)  # self.env.robot_num

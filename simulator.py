@@ -177,6 +177,11 @@ class Simulator:
             if self.robot_last_pos[id_][:2]==self.target[id_][:2]:
                 next_pos[id_] = [(pos[0], pos[1])]
 
+            # check if out of map
+            if self.out_of_map(next_pos[id_][0],self.size):
+                out_bound[id_] = True
+                next_pos[id_] = [(pos[0], pos[1])]
+
             self.robot[id_] = tuple(np.append(np.array(next_pos[id_][0]),self.robot[id_][2]))  
 
             # check if reached goal
@@ -184,16 +189,14 @@ class Simulator:
             target_pos[id_] = (_pos[0], _pos[1])
             if math.hypot(self.robot[id_][0]-target_pos[id_][0], self.robot[id_][1]-target_pos[id_][1])<1:
                 reached_goal[id_] = True
-            # check if out of map
-            if self.out_of_map(next_pos[id_][0],self.size):
-                out_bound[id_] = True
+
 
         assert math.hypot(next_pos[id_][0][0]-self.robot[id_][0], next_pos[id_][0][1]-self.robot[id_][1]) < 1.4, "Next step is too far away, which is so weird"
         assert self.robot[id_][2] >= 0, "robot defination id error"  # these asserts are from previous repo and I don't understand them
 
         # check collision between robots
         collision = self.collision_check(next_pos)
-        done = np.array(collision).any() or np.array(out_bound).any()  # wqwqwq
+        done = np.array(collision).any()# or np.array(out_bound).any()  # wqwqwq
 
         obs = self.compute_obs(collision,out_bound,reached_goal)
         reward = self.compute_reward(action,collision,out_bound,reached_goal)
