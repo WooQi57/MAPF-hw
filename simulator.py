@@ -249,11 +249,12 @@ class Simulator:
             else:
                 reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/(self.size[0]//scale) + 8
 
-            if self.debug:
-                print(f"after reward for goal:{reward} {(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))}")
             # reward for collision and out of map
             if collision[id_] or out_bound[id_]:
-                reward[id_] -= 5
+                reward[id_] -= 20
+
+            if self.debug:
+                print(f"after reward for goal:{reward} {(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))}")
 
         return reward
 
