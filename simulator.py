@@ -66,8 +66,8 @@ class Simulator:
         """
         generate random map to increase the complexity
         """
-        rnd = np.random
-        rnd.seed(5457)
+        # rnd = np.random
+        # rnd.seed(5457)
         assert size[0]*size[1]>robot_num *scale*3
         for i in range(1,size[0]//scale):
             cv2.line(self.canvas, (scale*i,scale), (scale*i,(size[1]//scale-1)*scale), (0,0,0))
