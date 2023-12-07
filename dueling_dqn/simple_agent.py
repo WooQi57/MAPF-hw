@@ -98,7 +98,7 @@ class dqn_agent:
         print(f"model saved in {self.model_path}")
         if not os.path.exists(self.model_path):
             os.mkdir(self.model_path)
-        episode_reward = reward_recoder(self.env.robot_num)  # 
+        episode_reward = reward_recoder(self.env.robot_num)
         obs = self.env.reset()
         td_loss = 0
         for timestep in range(int(self.args.total_timesteps)):

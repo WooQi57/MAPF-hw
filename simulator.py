@@ -24,7 +24,7 @@ class Simulator:
         self.robot_carry = dict()
         self.size = size
         self.robot_num = robot_num
-        self.observation_per_robot = 7
+        self.observation_per_robot = 8
         self.frames = []
         self.name = name
         self.steps = 0
@@ -222,6 +222,7 @@ class Simulator:
             state[4] = int(collision[id_])
             state[5] = np.min([pos[0],-pos[0]+self.size[0]//scale,pos[1],-pos[1]+self.size[1]//scale])
             state[6] = abs(self.target[id_][0] - pos[0])+abs(self.target[id_][1] - pos[1])
+            state[7] = (id_+1)%self.robot_num
             obs.append(state)
         if self.debug:
             print(f"state: {obs}")
