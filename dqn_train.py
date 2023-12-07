@@ -45,8 +45,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     num_robots = 3
-    actions_per_robot = 5
-    env = Simulator((450,450,3),num_robots)  # 601
+    actions_per_robot = 3
+    # env = Simulator((450,450,3),num_robots,visual=True)  # 601
+    env = Simulator((250,250,3),num_robots,visual=True)
     observation_per_robot = env.observation_per_robot
     model = dqn_agent(env, actions_per_robot*num_robots , observation_per_robot*num_robots,args)
     if args.load_model:

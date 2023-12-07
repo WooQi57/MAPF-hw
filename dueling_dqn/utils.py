@@ -41,13 +41,13 @@ class linear_schedule:
 
 def select_action(action_value, explore_eps):
     action_value = action_value.cpu().numpy().squeeze()
-    action_value = action_value.reshape((-1,5))  # action_value is num_robots * 5
+    action_value = action_value.reshape((-1,3))  # action_value is num_robots * 5
     if random.random() > explore_eps:
         # print("stick to the plan")
         action = np.argmax(action_value, axis=1)  
     else:
         # print("explore")
-        action = np.random.randint(0,5,len(action_value))
+        action = np.random.randint(0,3,len(action_value))
     # print(f"action:{action}")
     return action
 

@@ -29,6 +29,7 @@ class Simulator:
         self.frames = []
         self.name = name
         self.steps = 0
+        self.path_step = np.zeros((self.robot_num))
         if static != None:
             self.robot, self.target = static
         self.colours = self.assign_colour(robot_num*3)
@@ -221,26 +222,32 @@ class Simulator:
         done = False
         target_pos = {}
         self.robot_last_pos = self.robot.copy()
-        path_length = np.array([len(i) for i in path_set.values()])
-        path_step = np.zeros((self.robot_num))
+        path_length = {key:len(value) for key,value in path_set.items()}
+        self.last_path_step = self.path_step.copy()
+
+        print(self.steps)
         # step simulation
         for id_, pos in self.robot.items():
             # take no action if reached the goal
             if action[id_] == 0: # stay
                 # path_step[id_] += 0
-                next_pos[id_] = (path_set[id_][int(path_step[id_])])
+                next_pos[id_] = [path_set[id_][int(self.path_step[id_])]]
             elif action[id_] == 1: # move to the next position in the pre-planned path
-                path_step[id_] += 1
-                next_pos[id_] = (path_set[id_][int(path_step[id_])])
+                self.path_step[id_] += 1
+                self.path_step[id_] = min(self.path_step[id_], path_length[id_]-1)
+                next_pos[id_] = [path_set[id_][int(self.path_step[id_])]]
             elif action[id_] == 2: # move back to the previous position in the pre-planned path
-                path_step[id_] -= 1
-                next_pos[id_] = (path_set[id_][int(path_step[id_])])
+                self.path_step[id_] -= 1
+                self.path_step[id_] = max(self.path_step[id_], 0)
+                next_pos[id_] = [path_set[id_][int(self.path_step[id_])]]
+            
+            print(f"id_={id_}, action={action[id_]}, next_pos={next_pos[id_][0]}, last_pos={(self.robot_last_pos[id_][0],self.robot_last_pos[id_][1])}, path_step={int(self.path_step[id_])}, path_len={path_length[id_]}")
 
             # # check if arrived at target. If so, stay.
             # if self.robot_last_pos[id_][:2]==self.target[id_][:2]:
             #     next_pos[id_] = [(pos[0], pos[1])]
 
-            self.robot[id_] = tuple(np.append(np.array(next_pos[id_][0]),self.robot[id_][2]))  ### ?????
+            self.robot[id_] = tuple(np.append(np.array(next_pos[id_]),self.robot[id_][2]))  ### ?????
 
             # check if reached goal
             _pos = self.target[id_]
@@ -249,20 +256,20 @@ class Simulator:
                 reached_goal[id_] = True
             # check if out of map
             if self.out_of_map(next_pos[id_][0],self.size):
-            # if self.out_of_map([next_pos[id_][0],next_pos[id_][1]],self.size): ###
                 out_bound[id_] = True
 
-        assert math.hypot(next_pos[id_][0][0]-self.robot[id_][0], next_pos[id_][0][1]-self.robot[id_][1]) < 1.4, "Next step is too far away, which is so weird"
+        assert math.hypot(next_pos[id_][0][0]-self.robot_last_pos[id_][0], next_pos[id_][0][1]-self.robot_last_pos[id_][1]) < 1.4, "Next step is too far away, which is so weird"
         assert self.robot[id_][2] >= 0, "robot defination id error"  # these asserts are from previous repo and I don't understand them
 
         # check collision between robots
         collision = self.collision_check(next_pos)
         done = np.array(collision).any() or np.array(out_bound).any()
 
-        obs = self.compute_obs(collision,out_bound,reached_goal,path_length,path_step)
-        reward = self.compute_reward(action,collision,out_bound,reached_goal,path_length,path_step)
+        obs = self.compute_obs(collision,out_bound,reached_goal,path_length)
+        reward = self.compute_reward(action,collision,out_bound,reached_goal,path_length)
         self.steps += 1
-        if self.steps > 80:
+        
+        if self.steps > 30:
                 done = True
 
         if self.visual:
@@ -321,7 +328,7 @@ class Simulator:
 
         teromere_x = np.sign(sx - gx)
         teromere_y = np.sign(sy - gy)
-        path.append([pos[0] + teromere_x, pos[1] + (1 - teromere_x ** 2) * teromere_y])
+        path.append((pos[0] + teromere_x, pos[1] + (1 - teromere_x ** 2) * teromere_y))
 
         return path
          
@@ -346,7 +353,7 @@ class Simulator:
         return [np.array(obs).ravel()]
     '''
 
-    def compute_obs(self,collision,out_bound,reached_goal,path_length,path_step): 
+    def compute_obs(self,collision,out_bound,reached_goal,path_length): 
         '''
         New version: follow pre_planned path
         self.observation_per_robot = 9
@@ -360,7 +367,7 @@ class Simulator:
             ## state[5] = np.min([abs(pos[0]),abs(pos[0]-self.size[0]),abs(pos[1]-0),abs(pos[1]-self.size[1]//scale)]) 
             state[5] = np.min([abs(pos[0]),abs(pos[0]-self.size[0]//scale),abs(pos[1]-0),abs(pos[1]-self.size[1]//scale)]) # distance to the wall =
             # state[6] = np.linalg.norm(np.array(self.target[id_])-np.array(pos[:2])) # distance to the target
-            state[6] = int(path_length[id_] - path_step[id_])/path_length[id_] # distance to the target
+            state[6] = int(path_length[id_] - self.path_step[id_])/path_length[id_] # distance to the target
             state[7] = int(reached_goal[id_]) # reached goal = 1, not reached goal = 0
 
             # state = self.simple_state(id_, False)
@@ -403,26 +410,27 @@ class Simulator:
         return reward 
         '''
 
-    def compute_reward(self,action,collision,out_bound,reached_goal,path_length,path_step): 
+    def compute_reward(self,action,collision,out_bound,reached_goal,path_length): 
         '''
         New version: follow pre_planned path
         '''
-        path = self.pre_planed_path()
         reward = np.zeros(self.robot_num)
         for id_, pos in self.robot.items():
             # reward for correct action
             target_pos = self.target[id_]
             if self.robot_last_pos[id_][:2]==target_pos[:2]: # prefer to stay if reached the goal
                 if action[id_] == 0: 
-                    reward[id_] += 2
+                    reward[id_] += 4
             if action[id_] == 0:  # stay
-                reward[id_] += -0.75
+                reward[id_] += -1
                 
             elif action[id_] == 1:  # move to the next position in the pre-planned path
-                reward[id_] += 0.5
+                reward[id_] += 1.5
             elif action[id_] == 2:  # move back to the previous position in the pre-planned path
-                reward[id_] += -1
+                reward[id_] += -1.75
             
+            if self.path_step[id_] <= 0:
+                reward[id_] += -60
 
             # reward for goal
             if reached_goal[id_]:
@@ -431,7 +439,7 @@ class Simulator:
             else:
                 ## reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8 #?????  why 8 ????? why size[0] 
                 # reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8
-                reward[id_] += - 2*(path_length[id_] - path_step[id_]) / path_length[id_] ### new
+                reward[id_] += - 2*(path_length[id_] - self.last_path_step[id_]) / path_length[id_] ### new
 
             # reward for collision and out of map
             if collision[id_] or out_bound[id_]:
@@ -516,6 +524,7 @@ class Simulator:
         self.steps = 0
         states = []
         self.frames = []
+        self.path_step = np.zeros((self.robot_num))
         # self.generate_map(self.robot_num, self.size)
 
         # reset canvas

@@ -22,6 +22,9 @@ class dqn_agent:
         self.args = args
         self.target_net = copy.deepcopy(self.net)
         self.target_net.load_state_dict(self.net.state_dict())
+        ############### new code starts ################
+        self.path_set = self.env.get_path_set() 
+        ############### new code starts ################
         
         if self.args.cuda:
             print(f"cuda available: {torch.cuda.is_available()}")
@@ -95,6 +98,7 @@ class dqn_agent:
         episode_reward = reward_recoder(1)  #wqwqwq episode_reward = reward_recoder(self.env.robot_num)
         obs = self.env.reset()
         td_loss = 0
+        
         for timestep in range(int(self.args.total_timesteps)):
             explore_eps = self.exploration_schedule.get_value(timestep)
             with torch.no_grad():
@@ -105,8 +109,7 @@ class dqn_agent:
             # print("get reward: ",reward)
             
             ############### new code starts ################
-            path_set = self.env.get_path_set() 
-            reward, obs_, done, _ = self.env.step(action, path_set) 
+            reward, obs_, done, _ = self.env.step(action, self.path_set) 
             ############### new code ends ################
 
             for i in range(len(obs)):
