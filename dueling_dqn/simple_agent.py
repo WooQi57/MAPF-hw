@@ -98,7 +98,7 @@ class dqn_agent:
         print(f"model saved in {self.model_path}")
         if not os.path.exists(self.model_path):
             os.mkdir(self.model_path)
-        episode_reward = reward_recoder(1)  # self.env.robot_num
+        episode_reward = reward_recoder(self.env.robot_num)  # 
         obs = self.env.reset()
         td_loss = 0
         for timestep in range(int(self.args.total_timesteps)):
@@ -107,23 +107,21 @@ class dqn_agent:
                 obs_tensor = self._get_tensors(obs)
                 action_value = self.net(obs_tensor)
             action = select_action(action_value, explore_eps, self.actions_per_robot)
-            reward, obs_, done, _ = self.env.step(action)
+            reward, obs_, done_arr, _ = self.env.step(action)
 
             # Enumerate robot and compute data point for fitting
             # Q(s,a):  s: a large observation; a: action (0-actions_per_robot*num_robots-1) Q: reward for robot corresponding to action
             for i in range(self.num_robots):
-                self.buffer.add(obs[0], i*self.actions_per_robot+action[i], reward[i], obs_[0], done)# TODO done? done_arr  
-                # TODO change action to an array of actions_per_robot^num_robots
-                # TODO change reward to a single scalar
-                # TODO change done to a single scalar
+                self.buffer.add(obs[0], i*self.actions_per_robot+action[i], reward[i], obs_[0], done_arr[i])
+                # TODO change action it makes no sense now
                 episode_reward.add_reward(reward[i],i)
             obs = obs_
-            # TODO avg reward problem  
+            done = done_arr.any()
             if done:
                 obs = np.array(self.env.reset())
+                writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
                 writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
                 writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
-                writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
                 episode_reward.start_new_episode() 
             
             if timestep > self.args.learning_starts and timestep % self.args.train_freq == 0:
