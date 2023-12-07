@@ -191,7 +191,7 @@ class Simulator:
                 reached_goal[id_] = True
 
 
-        assert math.hypot(next_pos[id_][0][0]-self.robot[id_][0], next_pos[id_][0][1]-self.robot[id_][1]) < 1.4, "Next step is too far away, which is so weird"
+        assert math.hypot(next_pos[id_][0][0]-self.robot_last_pos[id_][0], next_pos[id_][0][1]-self.robot_last_pos[id_][1]) < 1.4, "Next step is too far away, which is so weird"
         assert self.robot[id_][2] >= 0, "robot defination id error"  # these asserts are from previous repo and I don't understand them
 
         # check collision between robots
@@ -235,14 +235,14 @@ class Simulator:
                     reward[id_] += 3
             if action[id_] == 0:  # stay
                 reward[id_] -= 2
-            # elif action[id_] == 1:  # down
-            #     reward[id_] += -1 + (target_pos[1] - prev_pos[1] > 0) * 2
-            # elif action[id_] == 2:  # left
-            #     reward[id_] += -1 + (target_pos[0] - prev_pos[0] < 0) * 2
-            # elif action[id_] == 3:  # right
-            #     reward[id_] += -1 + (target_pos[0] - prev_pos[0] > 0) * 2
-            # elif action[id_] == 4:  # up
-            #     reward[id_] += -1 + (target_pos[1] - prev_pos[1] < 0) * 2
+            elif action[id_] == 1:  # down
+                reward[id_] += -1 + (target_pos[1] - prev_pos[1] > 0) * 2
+            elif action[id_] == 2:  # left
+                reward[id_] += -1 + (target_pos[0] - prev_pos[0] < 0) * 2
+            elif action[id_] == 3:  # right
+                reward[id_] += -1 + (target_pos[0] - prev_pos[0] > 0) * 2
+            elif action[id_] == 4:  # up
+                reward[id_] += -1 + (target_pos[1] - prev_pos[1] < 0) * 2
             
             if self.debug:
                 print(f"reward after action check:{reward}")
@@ -251,7 +251,7 @@ class Simulator:
                 # print(f"robot {id_} reached the goal and gets rewards")
                 reward[id_]+=10
             else:
-                reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/(self.size[0]//scale) + 8
+                reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/(self.size[0]//scale)
 
             # reward for collision and out of map
             if collision[id_] or out_bound[id_]:

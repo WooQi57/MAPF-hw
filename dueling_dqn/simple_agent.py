@@ -19,6 +19,7 @@ class dqn_agent:
     def __init__(self, env, num_actions, num_observation ,args):
         self.env = env
         self.net = simplenet(num_actions, num_observation)
+        self.num_actions = num_actions
         self.args = args
         self.target_net = copy.deepcopy(self.net)
         self.target_net.load_state_dict(self.net.state_dict())
@@ -104,7 +105,7 @@ class dqn_agent:
             with torch.no_grad():
                 obs_tensor = self._get_tensors(obs)
                 action_value = self.net(obs_tensor)
-            action = select_action(action_value, explore_eps)
+            action = select_action(action_value, explore_eps, self.num_actions)
             reward, obs_, done, _ = self.env.step(action)
             # print("get reward: ",reward)
 

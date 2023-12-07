@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # use double dqn
     parser.add_argument("--use_double_net", default=True, type=bool)
     # exploration fraction
-    parser.add_argument("--exploration_fraction", default=0.9, type=int)  # 0.7
+    parser.add_argument("--exploration_fraction", default=0.9, type=float)  # 0.7
     # random exploration init ratio
     parser.add_argument("--init_ratio", default=0.8, type=float)  # 0.7
     # random exploration final ratio
