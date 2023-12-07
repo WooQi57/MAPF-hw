@@ -44,20 +44,23 @@ def main():
     parser.add_argument("--load_model", default=True, type=bool)
     # save dir
     parser.add_argument("--save_dir", default='./models', type=str)
-        # number of robots
+    # number of robots
     parser.add_argument("--num_robots", default=3, type=int)
+    # number of obstacles
+    parser.add_argument("--num_obstacles", default=2, type=int)
     # map size
-    parser.add_argument("--map_size", default=7, type=int)
+    parser.add_argument("--map_size", default=5, type=int)
     args = parser.parse_args()
 
     num_robots = args.num_robots
+    obstacle_num=args.num_obstacles
     actions_per_robot = 5
-    env = Simulator((35*args.map_size+1,35*args.map_size+1,3),num_robots,visual=True,debug=True)  # 601
+    env = Simulator((35*args.map_size+1,35*args.map_size+1,3),num_robots,obstacle_num, visual=True,save_gif=None,debug=True)  # 601
     observation_per_robot = env.observation_per_robot
     model = dqn_agent(env, actions_per_robot, num_robots, observation_per_robot*num_robots,args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"/model_640813.pt")
+        model.load_dict(model_path+"/man-3-5/model_640813.pt")
 
     obs = env.reset()
     done = False
@@ -66,7 +69,7 @@ def main():
         with torch.no_grad():
             obs_tensor = model._get_tensors(obs)
             action_value = model.net(obs_tensor)
-        action = select_action(action_value, 0.1)
+        action = select_action(action_value, 0.5)
         reward, obs, done, _ = env.step(action)
         print("get reward: ",reward)
 

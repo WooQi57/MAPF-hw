@@ -11,7 +11,7 @@ scale = 35
 
 class Simulator:
 
-    def __init__(self, size, robot_num, static=None, visual=False, debug=False, name =''):
+    def __init__(self, size, robot_num, obstacle_num=0, static=None, visual=False, save_gif=None, debug=False, name =''):
         """
         Initialize simulator multi agent path finding
         robot: {index:(x,y,carry_index)}
@@ -24,17 +24,20 @@ class Simulator:
         self.robot_carry = dict()
         self.size = size
         self.robot_num = robot_num
-        self.observation_per_robot = 8
+        self.obstacle_num = obstacle_num
+        self.observation_per_robot = 8+2*obstacle_num
         self.frames = []
+        self.obstacles = dict()
         self.name = name
         self.steps = 0
         if static != None:
             self.robot, self.target = static
-        self.colours = self.assign_colour(robot_num*3)
+        self.colours = self.assign_colour(robot_num+obstacle_num)
         self.crash = []
-        self.generate_map(robot_num, size)    
+        self.generate_map(robot_num, size,obstacle_num)    
         self.visual = visual
         self.debug = debug
+        self.save_gif = save_gif
         # cv2.namedWindow("Factory")
         # cv2.resizeWindow('Factory', tuple(np.array(list(size)[:2])+np.array([500,200])))
     
@@ -42,23 +45,23 @@ class Simulator:
         for pair in pairs:
             self.robot[pair[0]] = (self.robot[pair[0]][0], self.robot[pair[0]][1], pair[1])
 
-    def generate_map(self, robot_num, size):
+    def generate_map(self, robot_num, size, obstacle_num=0):
         """
         generate random map to increase the complexity
         """
         rnd = np.random
-        rnd.seed(5258)
-        assert size[0]*size[1]>robot_num *scale*3
+        rnd.seed(5258)  #5258
+        assert size[0]*size[1]>(robot_num+obstacle_num) *scale*3
         self.canvas = np.ones(self.size, np.uint8)*255
         for i in range(1,size[0]//scale):
             cv2.line(self.canvas, (scale*i,scale), (scale*i,(size[1]//scale-1)*scale), (0,0,0))
         for i in range(1,size[1]//scale):
             cv2.line(self.canvas, (scale,i*scale), ((size[0]//scale-1)*scale,i*scale), (0,0,0))
         if len(self.robot) == 0:
-            pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
+            pos = rnd.randint(1,size[0]//scale, size=(2*robot_num+obstacle_num,2))
             pos = set([tuple(i) for i in pos])
-            while len(pos) < 3*robot_num:
-                temp = rnd.randint(1,size[0]//scale, size=(3*robot_num - len(pos),2))
+            while len(pos) < 2*robot_num+obstacle_num:
+                temp = rnd.randint(1,size[0]//scale, size=(2*robot_num+obstacle_num - len(pos),2))
                 b = set([tuple(i) for i in temp])
                 for i in b:
                     if i not in pos:
@@ -67,12 +70,11 @@ class Simulator:
             for i in range(robot_num):
                 self.robot[i] = (pos[i][0],pos[i][1],i)
                 self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1])
+            for ob in range(obstacle_num):
+                self.obstacles[ob] = (pos[ob+robot_num*2][0],pos[ob+robot_num*2][1])
+
         self.init_robot = self.robot.copy()
         self.init_target = self.target.copy()
-            
-        # for i in range(robot_num):
-        #     self.draw_target(self.canvas, np.array(self.target[i][2:])*scale, self.colours[i+len(self.robot)], 5)
-        #     self.robot_carry[i] = False   
 
     @staticmethod
     def assign_colour(num):
@@ -93,7 +95,6 @@ class Simulator:
         cv2.line(frame, tuple(point1), tuple(point2), color, thick)
         cv2.line(frame, tuple(point3), tuple(point4), color, thick)
 
-
     def show(self, wait=True):
         frame = deepcopy(self.canvas)
         font_scale = 1
@@ -101,7 +102,7 @@ class Simulator:
         color = (255,255,255)
         for id_, pos in self.target.items():
             size, _ = cv2.getTextSize('{0}'.format(id_),cv2.FONT_HERSHEY_COMPLEX,font_size,font_scale)
-            cv2.rectangle(frame, tuple(np.array(self.target[id_][:2])*scale-np.array([scale//3,scale//3])), tuple(np.array(self.target[id_][:2])*scale+np.array([scale//3,scale//3])), self.colours[id_+len(self.robot)],-1) 
+            cv2.rectangle(frame, tuple(np.array(self.target[id_][:2])*scale-np.array([scale//3,scale//3])), tuple(np.array(self.target[id_][:2])*scale+np.array([scale//3,scale//3])), self.colours[id_],-1) 
             cv2.putText(frame,'{0}'.format(id_),tuple([self.target[id_][0]*scale-size[0]//2, self.target[id_][1]*scale+size[1]//2]),cv2.FONT_HERSHEY_COMPLEX,font_size,color,font_scale)
         for id_, pos in self.robot.items():
             size, _ = cv2.getTextSize('{0}'.format(pos[-1]),cv2.FONT_HERSHEY_COMPLEX,font_size,font_scale)
@@ -114,39 +115,14 @@ class Simulator:
         else:
             cv2.waitKey(100)
         self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    
-    def get_state_map(self, index, show=False):
-        state = np.zeros((self.size[0]//scale+1, self.size[1]//scale+1))
-        for id_, pos in self.robot.items():
-            if id_ == index:
-                state[pos[0]][pos[1]] = -1
-            else:
-                state[pos[0]][pos[1]] -= -3
-        for id2_, pos2 in self.target.items():
-            if id2_ == self.robot[index][2]:
-                if state[pos2[0]][pos2[1]] == -1:
-                    self.robot_carry[id_] = True
-                    state[pos2[0]][pos2[1]] = 2
-                else:
-                    state[pos2[0]][pos2[1]] += 4
-                
-        state = np.rot90(state, 1)
-        if show:
-            plt.figure()
-            plt.imshow(state)
-            for i in range(len(state)):
-                for j in range(len(state[0])):
-                    c = str(state[i][j])
-                    plt.text(j, i, c, va='center', ha='center')
-            plt.xlim((-0.5,len(state[0])-0.5))
-            plt.ylim((-0.5,len(state)-0.5))
-            plt.show()
-        return np.array([state])
-    
+ 
     @staticmethod
-    def out_of_map(pos, size):
+    def out_of_map(pos, size, obstacles):
         if pos[0] <= 0 or pos[0] >= size[0]//scale or pos[1] <= 0 or pos[1] >= size[1]//scale:
             return True
+        for id_, ob_pos in obstacles.items():
+            if np.math.hypot(pos[0]-ob_pos[0], pos[1]-ob_pos[1]) < 1:
+                return True
         return False
 
     def step(self, action):
@@ -178,7 +154,7 @@ class Simulator:
                 next_pos[id_] = [(pos[0], pos[1])]
 
             # check if out of map
-            if self.out_of_map(next_pos[id_][0],self.size):
+            if self.out_of_map(next_pos[id_][0],self.size,self.obstacles):
                 out_bound[id_] = True
                 next_pos[id_] = [(pos[0], pos[1])]
 
@@ -198,7 +174,7 @@ class Simulator:
         collision = self.collision_check(next_pos)
         done_arr[:-1] = np.array(collision) # or np.array(out_bound).any()  # wqwqwq
 
-        obs = self.compute_obs(collision,out_bound,reached_goal)
+        obs = self.compute_obs(collision,out_bound,reached_goal,action)
         reward = self.compute_reward(action,collision,out_bound,reached_goal)
         self.steps += 1
         if self.steps > 80/4:
@@ -210,10 +186,10 @@ class Simulator:
             print(f"done:{done} done_arr:{done_arr} after or:{(1-np.array(reached_goal))}")
 
         if self.visual:
-            self.show_plot(next_pos, done, None, wait=self.debug)
+            self.show_plot(next_pos, done, save_gif=self.save_gif, wait=self.debug)
         return reward, np.array(obs), done_arr, {}
     
-    def compute_obs(self,collision,out_bound,reached_goal):
+    def compute_obs(self,collision,out_bound,reached_goal,action):
         obs=[]
         for id_, pos in self.robot.items():
             state = np.zeros(self.observation_per_robot)
@@ -222,7 +198,8 @@ class Simulator:
             state[4] = int(collision[id_])
             state[5] = np.min([pos[0],-pos[0]+self.size[0]//scale,pos[1],-pos[1]+self.size[1]//scale])
             state[6] = abs(self.target[id_][0] - pos[0])+abs(self.target[id_][1] - pos[1])
-            state[7] = (id_+1)%self.robot_num
+            state[7] = action[(id_+1)%self.robot_num]  # (id_+1)%self.robot_num
+            state[8:] = np.array(list(self.obstacles.values())).reshape(2*self.obstacle_num) 
             obs.append(state)
         if self.debug:
             print(f"state: {obs}")
@@ -294,56 +271,23 @@ class Simulator:
         except Exception as err:
             print(err)
         if save_gif!=None:
-            with imageio.get_writer("./image/"+save_gif, mode="I") as writer:
+            with imageio.get_writer("./image/"+save_gif, fps=0.5, mode="I") as writer:
                 for idx, frame in enumerate(self.frames):
                     writer.append_data(frame)
         cv2.waitKey(1)
 
-    def simple_state(self, index, test=False):
-        me = self.robot[index]
-        state = np.zeros(7)
-        state[0] = (self.target[self.robot[index][2]][0] - self.robot[index][0])/(self.size[0]//scale+1)
-        state[1] = (self.target[self.robot[index][2]][1] - self.robot[index][1])/(self.size[1]//scale+1)
-        if me[0] == 1:
-            # left
-            state[2] = 1
-        elif me[0] == self.size[0]//scale-1:
-            # right
-            state[3] = 1
-        if me[1] == 1:
-            # up
-            state[4] = 1
-        elif me[1] == self.size[1]//scale-1:
-            # down
-            state[5] = 1
-        if self.out_of_map(me, self.size):
-            state[6] = 1
-        
-        for id_, pos in self.robot.items():
-            if id_ == index:
-                continue
-            if np.math.hypot(self.robot[id_][0]-me[0], self.robot[id_][1]-me[1])<1.2:
-                if self.robot[id_][0]-me[0] < 0:
-                    state[2] = 1
-                elif self.robot[id_][0]-me[0] > 0:
-                    state[3] = 1
-                if self.robot[id_][1]-me[1] > 0:
-                    state[5] = 1
-                elif self.robot[id_][1]-me[1] < 0:
-                    state[4] = 1
-                if self.robot[id_][0]-me[0] == 0 and self.robot[id_][1]-me[1] == 0:
-                    state[6] = 1
-        return state
-
     def reset(self):
         self.crash = []
         self.robot = {}
-        self.robot_carry = {}
+        self.robot_last_pos = {}
         self.target = {}
         self.steps = 0
         states = []
         self.frames = []
         # self.generate_map(self.robot_num, self.size)
+        self.robot = self.init_robot.copy()
+        self.robot_last_pos = self.init_robot.copy()
+        self.target = self.init_target.copy()
 
         # reset canvas
         self.canvas = np.ones(self.size, np.uint8)*255
@@ -352,9 +296,14 @@ class Simulator:
                 cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.size[1]//scale-1)*scale), (0,0,0))
             for i in range(1,self.size[1]//scale):
                 cv2.line(self.canvas, (scale,i*scale), ((self.size[0]//scale-1)*scale,i*scale), (0,0,0))
+            for i in range(self.obstacle_num):
+                self.draw_target(self.canvas, np.array(self.obstacles[i])*scale, self.colours[i+len(self.robot)], 5)
 
-        self.robot = self.init_robot.copy()
-        self.target = self.init_target.copy()
+            init_pos = {}
+            for id_, pos in self.robot.items():
+                init_pos[id_] = [(pos[0], pos[1])]
+            self.show_plot(init_pos, False, save_gif=self.save_gif, wait=self.debug)
+
         for id_ in self.robot.keys():
             state = np.zeros(self.observation_per_robot)
             states.append(state)
@@ -419,70 +368,6 @@ class Simulator:
                     writer.append_data(frame)
         cv2.waitKey(1)
 
-    def stepold(self, action, simple=False):
-        path = {}
-        reward = np.array([-0.3 for i in action])
-        done = [False for i in action]
-        states = []
-        end = {}
-        for id_, pos in self.robot.items():
-            pos2 = self.target[pos[2]]
-            end[id_] = (pos2[0], pos2[1])
-
-            if action[id_] == 0:
-                path[id_] = [(pos[0], pos[1])]
-                reward[id_] -= 0.5
-            elif action[id_] == 1:
-                path[id_] = [(pos[0], pos[1]+1)]
-                if end[id_][1] - pos[1] > 0:
-                    reward[id_] += 1
-                else:
-                     reward[id_] -= 1
-            elif action[id_] == 2:
-                path[id_] = [(pos[0]-1, pos[1])]
-                if end[id_][0] - pos[0] < 0:
-                    reward[id_] += 1
-                else:
-                     reward[id_] -= 1
-            elif action[id_] == 3:
-                path[id_] = [(pos[0]+1, pos[1])]
-                if end[id_][0] - pos[0] > 0:
-                    reward[id_] += 1
-                else:
-                     reward[id_] -= 1
-            elif action[id_] == 4:
-                path[id_] = [(pos[0], pos[1]-1)]
-                if end[id_][1] - pos[1] < 0:
-                    reward[id_] += 1
-                else:
-                     reward[id_] -= 1
-            if self.out_of_map(path[id_][0], self.size):
-                reward[id_] -= 20
-                done[id_] = True
-            if self.steps > 80:
-                done[id_] = True
-
-        self.steps += 1
-        self.start_plot(path, None, False)
-        if len(self.crash) > 0:
-            for i in self.crash:
-                reward[i[0]] -= 20
-                reward[i[1]] -= 20
-                done[i[0]] = True
-                done[i[1]] = True
-        for id_ in self.robot.keys():
-            if simple == False:
-                state = self.get_state_map(id_, False)
-            else:
-                state = self.simple_state(id_, False)
-            states.append(state)
-            # reward -= 0.025*(abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1]))
-            if np.math.hypot(self.robot[id_][0]-end[id_][0], self.robot[id_][1]-end[id_][1])<1:
-                reward[id_] += 30
-                done[id_] = True
-
-        return reward, np.array(states), done, {}
- 
 if __name__ == "__main__":
     # random initialize
     # env1 = Simulator((601,601,3),8)
