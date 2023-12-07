@@ -156,7 +156,7 @@ class Simulator:
         reached_goal = [False for i in range(self.robot_num)]
         collision = [False for i in range(self.robot_num)]
         out_bound = [False for i in range(self.robot_num)]
-        done = False
+        done_arr = np.array([False for i in range(self.robot_num+1)])  # last entry is for completely done signal, first robot_num entries for each robot's termination
         target_pos = {}
         self.robot_last_pos = self.robot.copy()
 
@@ -196,17 +196,22 @@ class Simulator:
 
         # check collision between robots
         collision = self.collision_check(next_pos)
-        done = np.array(collision).any()# or np.array(out_bound).any()  # wqwqwq
+        done_arr[:-1] = np.array(collision) # or np.array(out_bound).any()  # wqwqwq
 
         obs = self.compute_obs(collision,out_bound,reached_goal)
         reward = self.compute_reward(action,collision,out_bound,reached_goal)
         self.steps += 1
         if self.steps > 80/4:
-                done = True
+            done_arr[:-1] = done_arr[:-1] | (1-np.array(reached_goal))
+            done_arr[-1] = True
+
+        done = done_arr.any()
+        if self.debug:
+            print(f"done:{done} done_arr:{done_arr} after or:{(1-np.array(reached_goal))}")
 
         if self.visual:
             self.show_plot(next_pos, done, None, wait=self.debug)
-        return reward, np.array(obs), done, {}
+        return reward, np.array(obs), done_arr, {}
     
     def compute_obs(self,collision,out_bound,reached_goal):
         obs=[]
