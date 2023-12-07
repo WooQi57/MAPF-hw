@@ -57,7 +57,7 @@ def main():
     model = dqn_agent(env, actions_per_robot, num_robots, observation_per_robot*num_robots,args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"/model_100000.pt")
+        model.load_dict(model_path+"/model_640813.pt")
 
     obs = env.reset()
     done = False
@@ -70,7 +70,7 @@ def main():
         reward, obs, done, _ = env.step(action)
         print("get reward: ",reward)
 
-        if done:
+        if done.any():
             obs = np.array(env.reset())  # not true
 
 
