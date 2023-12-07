@@ -138,7 +138,9 @@ class dqn_agent:
                 print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}, eps: {}'.format(datetime.now(), timestep, episode_reward.num_episodes, \
                         episode_reward.mean, td_loss, explore_eps))
                 model_name = f"/model_{episode_reward.num_episodes}.pt"
-                torch.save(self.net.state_dict(), self.model_path + model_name)
+                torch.save(self.net.state_dict(), self.model_path + model_name)                
+        model_name = f"/model_{episode_reward.num_episodes}.pt"
+        torch.save(self.net.state_dict(), self.model_path + model_name)
 
     def learn_fixed_path(self):
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
