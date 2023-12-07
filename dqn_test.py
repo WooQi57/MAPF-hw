@@ -55,10 +55,10 @@ def main():
     env = Simulator((35*args.map_size+1,35*args.map_size+1,3),num_robots,visual=True,debug=True)  # 601
 
     observation_per_robot = env.observation_per_robot
-    model = dqn_agent(env, actions_per_robot*num_robots , observation_per_robot*num_robots,args)
+    model = dqn_agent(env, actions_per_robot, actions_per_robot*num_robots , observation_per_robot*num_robots,args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"/model_25000.pt")
+        model.load_dict(model_path+"/model_100000.pt")
 
     obs = env.reset()
     done = False
