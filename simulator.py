@@ -25,7 +25,7 @@ class Simulator:
         self.size = size
         self.robot_num = robot_num
         # self.observation_per_robot = 7 ### Modified old version: Heading to the direction of the goal
-        self.observation_per_robot = 8 ### New version: follow pre_planned path
+        self.observation_per_robot = 4 ### New version: follow pre_planned path
         self.frames = []
         self.name = name
         self.steps = 0
@@ -48,7 +48,7 @@ class Simulator:
         generate random map to increase the complexity
         """
         rnd = np.random
-        rnd.seed(5258)
+        rnd.seed(5260)
         assert size[0]*size[1]>robot_num *scale*3
         self.canvas = np.ones(self.size, np.uint8)*255
         for i in range(1,size[0]//scale):
@@ -217,6 +217,7 @@ class Simulator:
         next_pos = {}
         reward = np.array([-0.3 for i in action])
         reached_goal = [False for i in range(self.robot_num)]
+        all_reached_goal = False
         collision = [False for i in range(self.robot_num)]
         out_bound = [False for i in range(self.robot_num)]
         done = False
@@ -225,7 +226,7 @@ class Simulator:
         path_length = {key:len(value) for key,value in path_set.items()}
         self.last_path_step = self.path_step.copy()
 
-        print(self.steps)
+        ## print(self.steps)
         # step simulation
         for id_, pos in self.robot.items():
             # take no action if reached the goal
@@ -241,7 +242,7 @@ class Simulator:
                 self.path_step[id_] = max(self.path_step[id_], 0)
                 next_pos[id_] = [path_set[id_][int(self.path_step[id_])]]
             
-            print(f"id_={id_}, action={action[id_]}, next_pos={next_pos[id_][0]}, last_pos={(self.robot_last_pos[id_][0],self.robot_last_pos[id_][1])}, path_step={int(self.path_step[id_])}, path_len={path_length[id_]}")
+            ## print(f"id_={id_}, action={action[id_]}, next_pos={next_pos[id_][0]}, last_pos={(self.robot_last_pos[id_][0],self.robot_last_pos[id_][1])}, path_step={int(self.path_step[id_])}, path_len={path_length[id_]}")
 
             # # check if arrived at target. If so, stay.
             # if self.robot_last_pos[id_][:2]==self.target[id_][:2]:
@@ -254,6 +255,7 @@ class Simulator:
             target_pos[id_] = (_pos[0], _pos[1])
             if math.hypot(self.robot[id_][0]-target_pos[id_][0], self.robot[id_][1]-target_pos[id_][1])<1:
                 reached_goal[id_] = True
+                all_reached_goal += reached_goal[id_]
             # check if out of map
             if self.out_of_map(next_pos[id_][0],self.size):
                 out_bound[id_] = True
@@ -269,8 +271,15 @@ class Simulator:
         reward = self.compute_reward(action,collision,out_bound,reached_goal,path_length)
         self.steps += 1
         
-        if self.steps > 30:
-                done = True
+        # if self.steps > 50:
+        #     reward -= 0.05 * reward 
+        
+        thres = 50
+        if self.steps > thres:
+            done = True
+        elif all_reached_goal == self.robot_num:
+            reward += np.ones((self.robot_num))*(thres-self.steps)*10*self.robot_num
+            done = True
 
         if self.visual:
             self.show_plot(next_pos, done, None, wait=False)
@@ -361,6 +370,16 @@ class Simulator:
         obs=[]
         for id_, pos in self.robot.items():
             state = np.zeros(self.observation_per_robot) # init state = [target_x, target_y, robot_x, robot_y, collision, out_of_map]
+            state[0] = int(collision[id_]) # collision = 1, no collision = 0
+            ## state[5] = np.min([abs(pos[0]),abs(pos[0]-self.size[0]),abs(pos[1]-0),abs(pos[1]-self.size[1]//scale)]) 
+            # state[1] = np.min([abs(pos[0]),abs(pos[0]-self.size[0]//scale),abs(pos[1]-0),abs(pos[1]-self.size[1]//scale)]) # distance to the wall =
+            # state[6] = np.linalg.norm(np.array(self.target[id_])-np.array(pos[:2])) # distance to the target
+            state[1] = int(path_length[id_] - self.path_step[id_])/path_length[id_] # distance to the target
+            state[2] = int(path_length[id_] - self.path_step[id_])/path_length[id_] # distance to the target
+            state[3] = int(reached_goal[id_]) # reached goal = 1, not reached goal = 0
+            
+            '''
+            state = np.zeros(self.observation_per_robot) # init state = [target_x, target_y, robot_x, robot_y, collision, out_of_map]
             state[:2] = self.target[id_] # target position 
             state[2:4] = pos[:2] # robot position
             state[4] = int(collision[id_]) # collision = 1, no collision = 0
@@ -369,7 +388,8 @@ class Simulator:
             # state[6] = np.linalg.norm(np.array(self.target[id_])-np.array(pos[:2])) # distance to the target
             state[6] = int(path_length[id_] - self.path_step[id_])/path_length[id_] # distance to the target
             state[7] = int(reached_goal[id_]) # reached goal = 1, not reached goal = 0
-
+            '''
+            
             # state = self.simple_state(id_, False)
             obs.append(state)
         return [np.array(obs).ravel()]
@@ -416,19 +436,32 @@ class Simulator:
         '''
         reward = np.zeros(self.robot_num)
         for id_, pos in self.robot.items():
+            # # reward for correct action
+            # target_pos = self.target[id_]
+            # if self.robot_last_pos[id_][:2]==target_pos[:2]: # prefer to stay if reached the goal
+            #     if action[id_] == 0: 
+            #         reward[id_] += 4
+            # if action[id_] == 0:  # stay
+            #     reward[id_] += -1
+                
+            # elif action[id_] == 1:  # move to the next position in the pre-planned path
+            #     reward[id_] += 1.5
+            # elif action[id_] == 2:  # move back to the previous position in the pre-planned path
+            #     reward[id_] += -1.75
+            
             # reward for correct action
             target_pos = self.target[id_]
             if self.robot_last_pos[id_][:2]==target_pos[:2]: # prefer to stay if reached the goal
                 if action[id_] == 0: 
-                    reward[id_] += 4
+                    reward[id_] += 5
             if action[id_] == 0:  # stay
                 reward[id_] += -1
                 
             elif action[id_] == 1:  # move to the next position in the pre-planned path
                 reward[id_] += 1.5
             elif action[id_] == 2:  # move back to the previous position in the pre-planned path
-                reward[id_] += -1.75
-            
+                reward[id_] += -3
+
             if self.path_step[id_] <= 0:
                 reward[id_] += -60
 
@@ -436,10 +469,10 @@ class Simulator:
             if reached_goal[id_]:
                 # print(f"robot {id_} reached the goal and gets rewards")
                 reward[id_]+=10
-            else:
-                ## reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8 #?????  why 8 ????? why size[0] 
-                # reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8
-                reward[id_] += - 2*(path_length[id_] - self.last_path_step[id_]) / path_length[id_] ### new
+            # else:
+            #     ## reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8 #?????  why 8 ????? why size[0] 
+            #     # reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8
+            #     reward[id_] += - 2*(path_length[id_] - self.last_path_step[id_]) / path_length[id_] ### new
 
             # reward for collision and out of map
             if collision[id_] or out_bound[id_]:
