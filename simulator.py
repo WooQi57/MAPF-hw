@@ -6,12 +6,12 @@ from copy import deepcopy
 import imageio
 from matplotlib import pyplot as plt
 import time
-# from AStarPlanner import AStarPlanner
+from AStarPlanner import AStarPlanner
 scale = 35
 
 class Simulator:
 
-    def __init__(self, size, robot_num, static=None, visual=False, debug=False, name =''):
+    def __init__(self, size, robot_num, obstacle_num=0,static=None, visual=False, debug=False, name =''):
         """
         Initialize simulator multi agent path finding
         robot: {index:(x,y,carry_index)}
@@ -23,22 +23,26 @@ class Simulator:
         self.target = dict()
         self.robot_carry = dict()
         self.size = size
+        self.width = self.size[0] // scale
+        self.height = self.size[1] // scale
         self.robot_num = robot_num
+        self.obstacle_num = obstacle_num
         # self.observation_per_robot = 6
         self.observation_per_robot = 8
         self.frames = []
+        # self.obstacles = dict()
         self.name = name
         self.steps = 0
         if static != None:
             self.robot, self.target = static
-        self.colours = self.assign_colour(robot_num*3)
+        self.colours = self.assign_colour(robot_num+obstacle_num)
         self.crash = []
-        self.generate_map(robot_num, size)    
+        # self.obstacles = {(2, 2), (3, 3), (4, 4)}  # Example obstacle positions
+        self.obstacles = set()
+        self.generate_map(robot_num, size, obstacle_num)    
         self.visual = visual
         self.debug = debug
-        # self.obstacles = {(2, 2), (3, 3), (4, 4)}  # Example obstacle positions
-        self.obstacles = {}
-        self.path_set = self.get_path_set(AStar=False) # get path set for each robot without using A*
+        self.path_set = self.get_path_set(AStar=True) # get path set for each robot without using A*
         self.path_length = {key:len(value) for key,value in self.path_set.items()}
 
         # cv2.namedWindow("Factory")
@@ -48,23 +52,25 @@ class Simulator:
         for pair in pairs:
             self.robot[pair[0]] = (self.robot[pair[0]][0], self.robot[pair[0]][1], pair[1])
 
-    def generate_map(self, robot_num, size):
+    def generate_map(self, robot_num, size, obstacle_num=0):
         """
         generate random map to increase the complexity
+        self.width = size[0]//scale
+        self.height = size[1]//scale
         """
         rnd = np.random
         rnd.seed(5258) # 5258
         assert size[0]*size[1]>robot_num *scale*3
         self.canvas = np.ones(self.size, np.uint8)*255
-        for i in range(1,size[0]//scale):
-            cv2.line(self.canvas, (scale*i,scale), (scale*i,(size[1]//scale-1)*scale), (0,0,0))
-        for i in range(1,size[1]//scale):
-            cv2.line(self.canvas, (scale,i*scale), ((size[0]//scale-1)*scale,i*scale), (0,0,0))
+        for i in range(1,self.width):
+            cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.height-1)*scale), (0,0,0))
+        for i in range(1,self.height):
+            cv2.line(self.canvas, (scale,i*scale), ((self.width-1)*scale,i*scale), (0,0,0))
         if len(self.robot) == 0:
-            pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
+            pos = rnd.randint(1,self.width, size=(2*robot_num+obstacle_num,2))
             pos = set([tuple(i) for i in pos])
-            while len(pos) < 3*robot_num:
-                temp = rnd.randint(1,size[0]//scale, size=(3*robot_num - len(pos),2))
+            while len(pos) < 2*robot_num+obstacle_num:
+                temp = rnd.randint(1,self.width, size=(2*robot_num+obstacle_num - len(pos),2))
                 b = set([tuple(i) for i in temp])
                 for i in b:
                     if i not in pos:
@@ -73,6 +79,8 @@ class Simulator:
             for i in range(robot_num):
                 self.robot[i] = (pos[i][0],pos[i][1],i)
                 self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1])
+            for ob in range(obstacle_num):
+                self.obstacles.add((pos[2*robot_num+ob][0], pos[2*robot_num+ob][1]))
         self.init_robot = self.robot.copy()
         self.init_target = self.target.copy()
             
@@ -107,7 +115,7 @@ class Simulator:
         color = (255,255,255)
         for id_, pos in self.target.items():
             size, _ = cv2.getTextSize('{0}'.format(id_),cv2.FONT_HERSHEY_COMPLEX,font_size,font_scale)
-            cv2.rectangle(frame, tuple(np.array(self.target[id_][:2])*scale-np.array([scale//3,scale//3])), tuple(np.array(self.target[id_][:2])*scale+np.array([scale//3,scale//3])), self.colours[id_+len(self.robot)],-1) 
+            cv2.rectangle(frame, tuple(np.array(self.target[id_][:2])*scale-np.array([scale//3,scale//3])), tuple(np.array(self.target[id_][:2])*scale+np.array([scale//3,scale//3])), self.colours[id_],-1) 
             cv2.putText(frame,'{0}'.format(id_),tuple([self.target[id_][0]*scale-size[0]//2, self.target[id_][1]*scale+size[1]//2]),cv2.FONT_HERSHEY_COMPLEX,font_size,color,font_scale)
         for id_, pos in self.robot.items():
             size, _ = cv2.getTextSize('{0}'.format(pos[-1]),cv2.FONT_HERSHEY_COMPLEX,font_size,font_scale)
@@ -122,7 +130,7 @@ class Simulator:
         self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     
     def get_state_map(self, index, show=False):
-        state = np.zeros((self.size[0]//scale+1, self.size[1]//scale+1))
+        state = np.zeros((self.width+1, self.h+1))
         for id_, pos in self.robot.items():
             if id_ == index:
                 state[pos[0]][pos[1]] = -1
@@ -227,15 +235,15 @@ class Simulator:
     def get_path_set(self, AStar=False):
         path_set = {}
         
-        # if AStar:# if using astar_planning, call the A* algorithm
-            # astar = AStarPlanner(self.size[0], self.size[1], self.obstacles)
-            # for id_, pos in self.robot.items():
-            #     path_set[id_] = astar.astar(self.init_robot[id_][0], self.init_robot[id_][1],
-            #                     self.init_target[id_][0], self.init_target[id_][1], [], [])
-        # else:# if using naive planning, call the naive planning algorithm
-        for id_, pos in self.robot.items():
-            path_set[id_] = self.naive_planning(self.init_robot[id_][0], self.init_robot[id_][1],
-                            self.init_target[id_][0], self.init_target[id_][1])
+        if AStar:# if using astar_planning, call the A* algorithm
+            astar = AStarPlanner(self.width, self.height, self.obstacles)
+            for id_, pos in self.robot.items():
+                path_set[id_] = astar.astar(self.init_robot[id_][0], self.init_robot[id_][1],
+                                self.init_target[id_][0], self.init_target[id_][1])
+        else:# if using naive planning, call the naive planning algorithm
+            for id_, pos in self.robot.items():
+                path_set[id_] = self.naive_planning(self.init_robot[id_][0], self.init_robot[id_][1],
+                                self.init_target[id_][0], self.init_target[id_][1])
 
         return path_set
 
@@ -289,15 +297,17 @@ class Simulator:
             # state[4] = self.robot[id_][1]
             # print(self.size)
             ##########wrong##########
-            state[3] = self.robot_last_pos[id_][0]/self.size[0] *2
-            state[4] = self.robot_last_pos[id_][1]/self.size[1] *2
+            
+
+            state[3] = self.robot_last_pos[id_][0]/(self.size[0] // scale)
+            state[4] = self.robot_last_pos[id_][1]/(self.size[1] // scale)
             # state[3] = self.robot[id_][0]/self.size
             # state[4] = self.robot[id_][1]/self.size
             state[5] = int(predict_next_collision[id_])
             
             ##########new###########
-            state[6] = self.robot[id_][0]/self.size[0] *2
-            state[7] = self.robot[id_][1]/self.size[1] *2
+            state[6] = self.robot[id_][0]/(self.size[0] // scale)
+            state[7] = self.robot[id_][1]/(self.size[1] // scale)
             ###########new###########
 
             obs.append(state)
@@ -479,10 +489,10 @@ class Simulator:
         # reset canvas
         self.canvas = np.ones(self.size, np.uint8)*255
         if self.visual:
-            for i in range(1,self.size[0]//scale):
-                cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.size[1]//scale-1)*scale), (0,0,0))
-            for i in range(1,self.size[1]//scale):
-                cv2.line(self.canvas, (scale,i*scale), ((self.size[0]//scale-1)*scale,i*scale), (0,0,0))
+            for i in range(1,self.width):
+                cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.height-1)*scale), (0,0,0))
+            for i in range(1,self.height):
+                cv2.line(self.canvas, (scale,i*scale), ((self.width-1)*scale,i*scale), (0,0,0))
 
         self.robot = self.init_robot.copy()
         self.target = self.init_target.copy()
