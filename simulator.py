@@ -24,7 +24,8 @@ class Simulator:
         self.robot_carry = dict()
         self.size = size
         self.robot_num = robot_num
-        self.observation_per_robot = 6
+        # self.observation_per_robot = 6
+        self.observation_per_robot = 8
         self.frames = []
         self.name = name
         self.steps = 0
@@ -52,7 +53,7 @@ class Simulator:
         generate random map to increase the complexity
         """
         rnd = np.random
-        rnd.seed(5258)
+        rnd.seed(5258) # 5258
         assert size[0]*size[1]>robot_num *scale*3
         self.canvas = np.ones(self.size, np.uint8)*255
         for i in range(1,size[0]//scale):
@@ -288,12 +289,17 @@ class Simulator:
             # state[4] = self.robot[id_][1]
             # print(self.size)
             ##########wrong##########
-            state[3] = self.robot_last_pos[id_][0]/self.size[0]
-            state[4] = self.robot_last_pos[id_][1]/self.size[1]
+            state[3] = self.robot_last_pos[id_][0]/self.size[0] *2
+            state[4] = self.robot_last_pos[id_][1]/self.size[1] *2
             # state[3] = self.robot[id_][0]/self.size
             # state[4] = self.robot[id_][1]/self.size
             state[5] = int(predict_next_collision[id_])
             
+            ##########new###########
+            state[6] = self.robot[id_][0]/self.size[0] *2
+            state[7] = self.robot[id_][1]/self.size[1] *2
+            ###########new###########
+
             obs.append(state)
 
         # self.observation_per_robot = len(state) # observation length
@@ -305,10 +311,12 @@ class Simulator:
         if self.debug:
             print(f"action:{action}")
         reward = np.zeros(self.robot_num)
+        '''
         for id_, pos in self.robot.items():
             # reward for correct action
             target_pos = self.target[id_]
             if (reached_goal[id_]) | (self.robot_last_pos[id_][:2]==target_pos[:2]): # prefer to stay if reached the goal
+                # reward[id_] += 14 ####################use this! 
                 reward[id_] += 4
                 if action[id_] == 0: 
                     reward[id_] += 6
@@ -328,7 +336,7 @@ class Simulator:
                 reward[id_] += -60
 
             # reward for goal
-            if (reached_goal[id_]) or (self.last_path_step[id_]!=self.last_path_step[id_]) :
+            if (reached_goal[id_]) and (self.last_path_step[id_]!=self.last_path_step[id_]) :
                 # print(f"robot {id_} reached the goal and gets rewards")
                 # reward[id_] += 25
                 reward[id_] += 40
@@ -341,6 +349,44 @@ class Simulator:
             if collision[id_] :
                 # reward[id_] -= 15
                 reward[id_] -= 15
+            '''
+
+        for id_, pos in self.robot.items():
+            # reward for correct action
+            target_pos = self.target[id_]
+            if (reached_goal[id_]) | (self.robot_last_pos[id_][:2]==target_pos[:2]): # prefer to stay if reached the goal
+                reward[id_] += 2
+                if action[id_] == 0: 
+                    reward[id_] += 5
+            if action[id_] == 0:  # stay
+                reward[id_] += -2
+            elif action[id_] == 1:  # move to the next position in the pre-planned path
+                reward[id_] += 3
+            # if (reached_goal[id_]) | (self.robot_last_pos[id_][:2]==target_pos[:2]): # prefer to stay if reached the goal
+            #     if action[id_] == 0: 
+            #         reward[id_] += 6
+            # if action[id_] == 0:  # stay
+            #     reward[id_] += -3
+            # elif action[id_] == 1:  # move to the next position in the pre-planned path
+            #     reward[id_] += 6
+            
+            if self.path_step[id_] <= 0 | self.path_step[id_] >= self.path_length[id_]: # if the robot is out of the path
+                reward[id_] += -60
+
+            # reward for goal
+            if (reached_goal[id_]) and (self.last_path_step[id_]!=self.last_path_step[id_]) :
+                # print(f"robot {id_} reached the goal and gets rewards")
+                # reward[id_] += 25
+                reward[id_] += 20
+            # else:
+                ## reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8 #?????  why 8 ????? why size[0] 
+                # reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8
+                # reward[id_] += - 2*(path_length[id_] - self.last_path_step[id_]) / path_length[id_] ### new
+
+            # reward for collision and out of map
+            if collision[id_] :
+                # reward[id_] -= 15
+                reward[id_] -= 10
 
 
             if self.debug:

@@ -63,9 +63,8 @@ def main():
         # model.load_dict(model_path+"/model_advanced_stage_82000.pt")
         # model.load_dict(model_path+"/model_teenage_stage_58000.pt")
         # model.load_dict(model_path+"/model_baby_stage_30000.pt")
-        model.load_dict(model_path+"/model_2000.pt")
-
-
+        # model.load_dict(model_path+"/new_model_24000.pt") # 1 starts to go first
+        model.load_dict(model_path+"/latest_model_24000.pt")
 
 
 
