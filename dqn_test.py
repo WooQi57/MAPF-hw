@@ -51,7 +51,7 @@ def main():
     args = parser.parse_args()
 
     num_robots = args.num_robots
-    actions_per_robot = 5
+    actions_per_robot = 2
     env = Simulator((35*args.map_size+1,35*args.map_size+1,3),num_robots,visual=True,debug=True)  # 601
     observation_per_robot = env.observation_per_robot
     model = dqn_agent(env, actions_per_robot, num_robots, observation_per_robot*num_robots,args)
@@ -66,7 +66,7 @@ def main():
         with torch.no_grad():
             obs_tensor = model._get_tensors(obs)
             action_value = model.net(obs_tensor)
-        action = select_action(action_value, 0.1)
+        action = select_action(action_value, 0.1, actions_per_robot )
         reward, obs, done, _ = env.step(action)
         print("get reward: ",reward)
 
@@ -74,43 +74,43 @@ def main():
             obs = np.array(env.reset())  # not true
 
 
-def main2():
-    parser = argparse.ArgumentParser()
-    # env name
-    parser.add_argument("--env_name", default="MAPF", type=str)
-    # use cuda
-    parser.add_argument("--cuda", default=True, type=bool)
-    # load model to continue
-    parser.add_argument("--load_model", default=True, type=bool)
-    # save dir
-    parser.add_argument("--save_dir", default='.\models', type=str)
-    args = parser.parse_args()
+# def main2():
+#     parser = argparse.ArgumentParser()
+#     # env name
+#     parser.add_argument("--env_name", default="MAPF", type=str)
+#     # use cuda
+#     parser.add_argument("--cuda", default=True, type=bool)
+#     # load model to continue
+#     parser.add_argument("--load_model", default=True, type=bool)
+#     # save dir
+#     parser.add_argument("--save_dir", default='.\models', type=str)
+#     args = parser.parse_args()
 
-    robot_num = 25
-    env = Simulator((601,601,3),robot_num)
+#     robot_num = 25
+#     env = Simulator((601,601,3),robot_num)
     
-    model = dqn_agent(env, args)
-    if args.load_model:
-        model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"\model40.983375549316406.pt")
-    obs = env.reset(True)
-    robots, targets = env.information()
-    pairs = get_allocate_matrix(robots, targets)
-    env.update_pairs(pairs)
-    env_2 = Simulator((601,601,3), robot_num, [robots.copy(), targets.copy()],'final')
-    done = False
-    while not done:
-        action = np.zeros(robot_num)
-        for i in range(robot_num):
-            action_temp = np.zeros(robot_num)
-            robot_action = target_policy(obs[i])
-            action_temp[i] = robot_action
-            reward, obs_, done, _ = env_2.step_test(action_temp, True)
-            obs = obs_
-            action[i] = robot_action
-        reward, obs_, done, _ = env.step_test(action, True, "Multi_DQN_test.gif")
-        obs = obs_
-        done = np.array(done).all()
+#     model = dqn_agent(env, args)
+#     if args.load_model:
+#         model_path = os.path.join(args.save_dir, args.env_name)
+#         model.load_dict(model_path+"\model40.983375549316406.pt")
+#     obs = env.reset(True)
+#     robots, targets = env.information()
+#     pairs = get_allocate_matrix(robots, targets)
+#     env.update_pairs(pairs)
+#     env_2 = Simulator((601,601,3), robot_num, [robots.copy(), targets.copy()],'final')
+#     done = False
+#     while not done:
+#         action = np.zeros(robot_num)
+#         for i in range(robot_num):
+#             action_temp = np.zeros(robot_num)
+#             robot_action = target_policy(obs[i])
+#             action_temp[i] = robot_action
+#             reward, obs_, done, _ = env_2.step_test(action_temp, True)
+#             obs = obs_
+#             action[i] = robot_action
+#         reward, obs_, done, _ = env.step_test(action, True, "Multi_DQN_test.gif")
+#         obs = obs_
+#         done = np.array(done).all()
 
 if __name__ =="__main__":
     main()

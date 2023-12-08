@@ -273,9 +273,11 @@ class Simulator:
             state = np.zeros(self.observation_per_robot) # -> 5
             state[0] = int(collision[id_]) # collision -> 1, no collision -> 0
             state[1] = self.path_step[id_]/self.path_length[id_] # path progress
-            state[2] = max(0, (self.last_path_step[id_])/self.path_length[id_]) # previous path progress
-            state[3] = min((self.path_step[id_]+1)/self.path_length[id_], 1) # next path progress if move forward
-            state[4] = int(reached_goal[id_]) # reached goal -> 1, not reached -> 0
+            state[2] = (self.last_path_step[id_])/self.path_length[id_] # previous path progress
+            # state[3] = min((self.path_step[id_]+1)/self.path_length[id_], 1) # next path progress if move forward
+            state[3] = self.robot[id_][0]
+            state[4] = self.robot[id_][1]
+
             
             obs.append(state)
 
