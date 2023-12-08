@@ -34,6 +34,8 @@ class Simulator:
         self.colours = self.assign_colour(robot_num*3)
         self.crash = []
 
+        self.obstacles = []
+
         # Handel the map_reset at th most begining to reproduce the later training procedure
         rnd = np.random
         rnd.seed(self.args.seed)    # 5457
@@ -209,13 +211,19 @@ class Simulator:
                         path[id_] = [(pos[0]+1, pos[1])]
                     elif action[id_] == 4:
                         path[id_] = [(pos[0], pos[1]-1)]
-                    
+                                        
                     if self.out_of_map(path[id_][0], self.size):
                         reward[id_] -= 20
                         done[id_] = True
-                    
                         # Remove the path[id_] if it is out of map
                         del path[id_]
+                    else:
+                        if path[id_][0] in self.obstacles:
+                            reward[id_] -= 20
+                            done[id_] = True
+                            # print("robot", id_, "hit the obstacle at {}".format(path[id_][0]))
+                            # Remove the path[id_] if collision happens
+                            del path[id_]
 
                     dist = abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1])
 
