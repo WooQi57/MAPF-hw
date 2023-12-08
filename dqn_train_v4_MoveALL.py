@@ -31,9 +31,9 @@ def get_args():
     # use double dqn
     parser.add_argument("--use_double_net", default=True, type=bool)
     # exploration fraction
-    parser.add_argument("--exploration_fraction", default=0.2, type=float)
+    parser.add_argument("--exploration_fraction", default=0.7, type=float)
     # random exploration init ratio
-    parser.add_argument("--init_ratio", default=0.2, type=float)
+    parser.add_argument("--init_ratio", default=0.7, type=float)
     # random exploration final ratio
     parser.add_argument("--final_ratio", default=0.1, type=float)
     # max time steps
@@ -66,7 +66,7 @@ def get_args():
 
     parser.add_argument("--save_gif", default=None, type=str)
 
-    parser.add_argument("--vis_seed", default=5457, type=int)
+    parser.add_argument("--seed", default=5457, type=int)
 
 
     args = parser.parse_args()
@@ -82,10 +82,7 @@ if __name__ == "__main__":
 
     if args.expand_obs:
         args.load_model = False
-        args.exploration_fraction = 0.7
-        args.init_ratio = 0.7
-    else:
-        args.load_model = True
+        
 
 
     print(args.exploration_fraction, args.init_ratio, args.final_ratio)
@@ -101,6 +98,7 @@ if __name__ == "__main__":
 
     if args.requireDoneAll:
         args.env_name += f"_RequireDoneAll"
+
 
 
     print(f"args.env_name: {args.env_name}")
@@ -123,6 +121,9 @@ if __name__ == "__main__":
     
 
     if args.load_model:
+        args.exploration_fraction = 0.2
+        args.init_ratio = 0.2
+
         model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models_prior/MAPF_Dynamic_4/M_10x10/AllMove_4/model_E_962000_R_12_L_0.pt"
 
 
@@ -143,6 +144,13 @@ python dqn_train_v4_MoveALL.py --env_name MAPF_Move --map_size 10 --num_robot 4 
 
 python dqn_train_v4_MoveALL.py --env_name MAPF_Move --map_size 10 --num_robot 4 --requireDoneAll --oldReward > txt_log/requireDoneAll_oldReward.txt
 python dqn_train_v4_MoveALL.py --env_name MAPF_Move --map_size 10 --num_robot 4 --requireDoneAll --ssh --oldReward > txt_log/requireDoneAll_oldReward.txt
+
+
+python dqn_train_v4_MoveALL.py --env_name MAPF_Move --map_size 10 --num_robot 4 --requireDoneAll --ssh --oldReward > txt_log/fromScratch.txt
+
+
+python dqn_train_v4_MoveALL.py --env_name debug --map_size 10 --num_robot 4 --requireDoneAll --ssh --oldReward > txt_log/debug.txt
+
 
 
 python dqn_train_v4_MoveALL.py --ssh 1 --env_name MAPF_Static --map_size 10 --num_robot 4 --reset_seed_inprocess > txt_log/v3_Multi_10_RESET_tmux4.txt

@@ -37,6 +37,13 @@ class dqn_agent:
 
         if self.args.expand_obs:
             sub_folder += "_expandObs"
+
+        
+        if self.args.load_model:
+            sub_folder += "_CT"
+
+
+        
         self.model_path = os.path.join(self.model_path, sub_folder)
 
 
@@ -65,6 +72,7 @@ class dqn_agent:
         
         for timestep in range(int(self.args.total_timesteps)):
             explore_eps = self.exploration_schedule.get_value(timestep)
+
             with torch.no_grad():
                 obs_tensor = self._get_tensors(obs)
                 action_value = self.net(obs_tensor)
@@ -86,11 +94,13 @@ class dqn_agent:
 
             # import pdb; pdb.set_trace()
 
-
             for i in range(len(obs)):
                 if not pre_done[i]:
                     self.buffer.add(obs[i], action[i], reward[i], obs_[i], float(done[i]))
                     episode_reward.add_reward(reward[i],i)
+
+            pre_done = done
+            
             obs = obs_
             
             # done = np.array(done).any()
@@ -113,6 +123,8 @@ class dqn_agent:
 
             if done:
                 obs = np.array(self.env.reset(True))
+                for i in range(obs.shape[0]):
+                    pre_done[i] = False
                 # Latest reward should be the mean of all agents termination reward average
                 latest_reward = episode_reward.latest_crossAgents
                 mean_reward = episode_reward.mean_crossAgents

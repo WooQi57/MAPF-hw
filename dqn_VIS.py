@@ -61,15 +61,18 @@ if __name__ == "__main__":
     class_folder = "./models/MAPF_Move_4_RequireDoneAll/"
     if args.expand_obs:
         folder_path = "./M_10x10_1207_235305_expandObs"
-        model_path = class_folder + folder_path + "/model_E_220000_Suc_3_Dist_9_LR_-6_MR_-10_L_12.pt"
+        model_path = class_folder + folder_path + "/model_E_278000_Suc_4_Dist_0_LR_4_MR_-3_L_4.pt"
 
 
     else:
         # args.save_gif = "MAPF_Move_4_RequireDoneAll"
         
-        folder_path = "./M_10x10_1207_220013_oldReward"
-        model_path = class_folder + folder_path + "/model_E_315000_Suc_4_Dist_0_LR_45_MR_8_L_39.pt"
-        # model_path = class_folder + folder_path + "/model_E_316000_Suc_4_Dist_0_LR_44_MR_17_L_78.pt"
+        # folder_path = "./M_10x10_1207_220013_oldReward_CT"
+        # model_path = class_folder + folder_path + "/model_E_315000_Suc_4_Dist_0_LR_45_MR_8_L_39.pt"
+
+
+        folder_path = "./M_10x10_1208_022224_oldReward"
+        model_path = class_folder + folder_path + "/model_E_300000_Suc_4_Dist_0_LR_43_MR_-24_L_193.pt"
 
 
     args.save_gif = class_folder + folder_path + ".gif"

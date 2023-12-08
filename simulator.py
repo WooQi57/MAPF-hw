@@ -36,10 +36,7 @@ class Simulator:
 
         # Handel the map_reset at th most begining to reproduce the later training procedure
         rnd = np.random
-        if self.args.save_gif != None:
-            rnd.seed(self.args.vis_seed)
-        else:
-            rnd.seed(5457)
+        rnd.seed(self.args.seed)    # 5457
         if len(self.robot) == 0:
             pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
             pos = set([tuple(i) for i in pos])
