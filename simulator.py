@@ -51,8 +51,13 @@ class Simulator:
 
         self.fix_pos = pos
 
-
-        self.generate_map(robot_num, size)    
+        if self.args.wq_test:
+            # import pdb; pdb.set_trace()
+            assert self.args.map_size == 5, "args.map_size == 5"
+            assert self.args.num_robot == 3, "args.num_robot == 3"
+            self.wq_test_map(robot_num, size)
+        else:
+            self.generate_map(robot_num, size)    
         # cv2.namedWindow("Factory")
         # cv2.resizeWindow('Factory', tuple(np.array(list(size)[:2])+np.array([500,200])))
 
@@ -76,18 +81,32 @@ class Simulator:
             for i in range(robot_num):
                 self.robot[i] = (pos[i][0],pos[i][1],i)
                 # self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+2*robot_num][0], pos[i+2*robot_num][1])
-                self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+robot_num][0], pos[i+robot_num][1])
-
-
+                # self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+robot_num][0], pos[i+robot_num][1])
+                self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1])
 
         for i in range(robot_num):
-            self.draw_target(self.canvas, np.array(self.target[i][2:])*scale, self.colours[i+len(self.robot)], 5)
+            # self.draw_target(self.canvas, np.array(self.target[i][2:])*scale, self.colours[i+len(self.robot)], 5)
             self.robot_carry[i] = False    
-
 
         if self.args.reset_seed_inprocess:
             # reset rnd seed for the later training portion
             np.random.seed(int(time.time()))
+
+    def wq_test_map(self, robot_num, size):
+        self.robot_num = 3
+        self.robot = {0:(2,4,0),1:(2,1,1),2:(3,4,2)}
+        self.target = {0:(3,1),1:(1,1),2:(2,3)}
+        self.robot_carry = {0:False,1:False,2:False}
+        self.obstacles = [(2,2),(4,1)]
+
+        for i, obs in enumerate(self.obstacles):
+            self.draw_target(self.canvas, np.array(obs)*scale, self.colours[i+len(self.robot)], 5)
+
+        for i in range(1,size[0]//scale):
+            cv2.line(self.canvas, (scale*i,scale), (scale*i,(size[1]//scale-1)*scale), (0,0,0))
+        for i in range(1,size[1]//scale):
+            cv2.line(self.canvas, (scale,i*scale), ((size[0]//scale-1)*scale,i*scale), (0,0,0))
+
 
     @staticmethod
     def assign_colour(num):
@@ -231,11 +250,15 @@ class Simulator:
             # NOTE: USE THIS BRANCH
             # state = self.simple_state(id_)
 
-            if self.args.expand_obs:
-                state = self.expand_state(id_)
-                # state = state[:7]
+
+            if self.args.wq_test:
+                state = self.compute_state(id_)
             else:
-                state = self.simple_state(id_)
+                if self.args.expand_obs:
+                    state = self.expand_state(id_)
+                    # state = state[:7]
+                else:
+                    state = self.simple_state(id_)
 
 
             states.append(state)
@@ -270,6 +293,101 @@ class Simulator:
 
         return reward, np.array(states), done, info
     
+
+    def compute_state(self, index):
+        me = self.robot[index]
+
+        if self.args.expand_obs:
+            state = np.zeros(7+8) # 2 + 4 + 1 + [4 (2xstep) + 4(corner) only consider robots!]
+        else:
+            state = np.zeros(7)
+
+        state[0] = (self.target[self.robot[index][2]][0] - self.robot[index][0])/(self.size[0]//scale+1)
+        state[1] = (self.target[self.robot[index][2]][1] - self.robot[index][1])/(self.size[1]//scale+1)
+
+        if me[0] == 1:
+            # left
+            state[2] = 1
+        elif me[0] == self.size[0]//scale-1:
+            # right
+            state[3] = 1
+        if me[1] == 1:
+            # up
+            state[4] = 1
+        elif me[1] == self.size[1]//scale-1:
+            # down
+            state[5] = 1
+
+        # Has terminated
+        if self.out_of_map(me, self.size):
+            state[6] = 1
+        
+        potential_obs = []
+        for id_, pos in self.robot.items():
+            if id_ != index:
+                potential_obs.append(pos[:2])
+        if self.args.wq_test:
+            for obs in self.obstacles:
+                potential_obs.append(obs)
+        
+        for pos in potential_obs:
+
+            # 2 + 4 + 1 + [4 (2xstep) + 4(corner) only consider robots!]
+            manhaton_dist = abs(pos[0]-me[0])+abs(pos[1]-me[1])
+
+            if manhaton_dist <= 2:
+                left = (pos[0]-me[0] == -1)
+                right = (pos[0]-me[0] == 1)
+                up = (pos[1]-me[1] == -1)
+                down = (pos[1]-me[1] == 1)
+
+                left_2  = (pos[0]-me[0] == -2)
+                right_2 = (pos[0]-me[0] == 2)
+                up_2    = (pos[1]-me[1] == -2)
+                down_2  = (pos[1]-me[1] == 2)
+
+            if manhaton_dist == 0:
+                state[6] = 1
+
+            if manhaton_dist == 1:
+                start_from = 2
+                if left:
+                    state[start_from+0] = 1    # left
+                elif right:
+                    state[start_from+1] = 1    # right
+                elif up:
+                    state[start_from+2] = 1    # up
+                elif down:
+                    state[start_from+3] = 1     # down         
+
+            if self.args.expand_obs:
+                if manhaton_dist == 2:
+                    start_from = 2+4+1
+
+                    if left_2:
+                        state[start_from+0] = 1    # left_2
+                    elif right_2:
+                        state[start_from+1] = 1    # right
+                    elif up_2:
+                        state[start_from+2] = 1    # up
+                    elif down_2:
+                        state[start_from+3] = 1     # down    
+
+                    start_from = 2+4+1+4
+
+                    if left and up:
+                        state[start_from+0] = 1    # left and up
+                    elif left and down:
+                        state[start_from+1] = 1    # left and down
+                    elif right and up:
+                        state[start_from+2] = 1    # right and up
+                    elif right and down:
+                        state[start_from+3] = 1    # right and down
+
+        return state
+
+
+
 
     def expand_state(self, index, test=False):
         me = self.robot[index]
@@ -408,14 +526,27 @@ class Simulator:
         self.steps = 0
         states = []
         self.frames = []
-        self.generate_map(self.robot_num, self.size)
+        # self.generate_map(self.robot_num, self.size)
+
+        if self.args.wq_test:
+            # import pdb; pdb.set_trace()
+            assert self.args.map_size == 5, "args.map_size == 5"
+            assert self.args.num_robot == 3, "args.num_robot == 3"
+            self.wq_test_map(self.robot_num, self.size)
+        else:
+            self.generate_map(self.robot_num, self.size)    
+
+
         for id_ in self.robot.keys():
 
-            if self.args.expand_obs:
-                state = self.expand_state(id_)
-                # state = state[:7]
+            if self.args.wq_test:
+                state = self.compute_state(id_)
             else:
-                state = self.simple_state(id_)
+                if self.args.expand_obs:
+                    state = self.expand_state(id_)
+                    # state = state[:7]
+                else:
+                    state = self.simple_state(id_)
                 
             self.robot_carry[id_] = False
             states.append(state)
@@ -557,4 +688,3 @@ if __name__ == "__main__":
         if np.array(done).any():
             print("done")
             break
-

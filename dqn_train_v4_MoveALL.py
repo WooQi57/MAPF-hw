@@ -64,6 +64,8 @@ def get_args():
 
     parser.add_argument("--expand_obs", action='store_true', default=False)
 
+    parser.add_argument("--wq_test", action='store_true', default=False)
+
     parser.add_argument("--save_gif", default=None, type=str)
 
     parser.add_argument("--seed", default=5457, type=int)
@@ -79,6 +81,16 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
+
+    if args.wq_test:
+        args.env_name = "Wq_Test"
+        args.map_size = 5
+        args.num_robot = 3
+        args.requireDoneAll = True
+        args.oldReward = True
+
+
+    
 
     if args.expand_obs:
         args.load_model = False

@@ -14,6 +14,14 @@ from dqn_train_v4_MoveALL import get_args
 if __name__ == "__main__":
     args = get_args()
 
+    if args.wq_test:
+        args.env_name = "Wq_Test"
+        args.map_size = 5
+        args.num_robot = 3
+        args.requireDoneAll = True
+        args.oldReward = True
+
+
     args.moveAll = True
 
     timestamp = datetime.datetime.now().strftime("%m%d_%H%M%S")
@@ -24,14 +32,14 @@ if __name__ == "__main__":
 
     model_path = ""
 
-    args.num_robot=1
+    # args.num_robot=1
 
     # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_ResetSeed/M_10x10_1205_185116/model_E_869000_R_90_L_23.pt"
     # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF/M_10x10_1205_182729/model_E_903000_R_96_L_0.pt"
 
 
 
-    args.num_robot=4
+    # args.num_robot=4
 
     # RESET SEED TO 5457 at every time ...
     # model_path = "/home/ziang/Public/AA228_Project/MAPF-hw/models/MAPF_Static_4/M_10x10_1205_182846/model_E_582000_R_74_L_2.pt"
