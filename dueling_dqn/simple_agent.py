@@ -8,43 +8,63 @@ from torch.utils.tensorboard import SummaryWriter
 from dueling_dqn.utils import linear_schedule, replay_buffer, reward_recoder, select_action, set_init
 from .model import simplenet
 
-writer = SummaryWriter('./dueling_dqn/logs')
+
 
 class dqn_agent:
     def __init__(self, env, args):
         self.env = env
-        self.net = simplenet(5)
+        if args.expand_obs:
+            self.net = simplenet(5, expand_dim=8)
+        else:
+            self.net = simplenet(5)
         self.args = args
         self.target_net = copy.deepcopy(self.net)
         self.target_net.load_state_dict(self.net.state_dict())
 
         self.timestamp = datetime.datetime.now().strftime("%m%d_%H%M%S")
-        
-        if self.args.cuda:
-            self.net.cuda()
-            self.target_net.cuda()
-    
-    def learn(self):
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
-        self.buffer = replay_buffer(self.args.buffer_size)
-        self.exploration_schedule = linear_schedule(int(self.args.total_timesteps * self.args.exploration_fraction), self.args.final_ratio, self.args.init_ratio)
-        
+
+
         if not os.path.exists(self.args.save_dir):
             os.mkdir(self.args.save_dir)
         # set the environment folder
         self.model_path = os.path.join(self.args.save_dir, self.args.env_name)        
         if not os.path.exists(self.model_path):
             os.mkdir(self.model_path)
+
+        sub_folder = f"M_{self.args.map_size}x{self.args.map_size}_{str(self.timestamp)}"
+        if self.args.oldReward:\
+            sub_folder += "_oldReward"
+
+        if self.args.expand_obs:
+            sub_folder += "_expandObs"
+        self.model_path = os.path.join(self.model_path, sub_folder)
+
+
+        self.log_folder = self.model_path
+        self.writer = SummaryWriter(self.log_folder)
+
+
+        
+        if self.args.cuda:
+            self.net.cuda()
+            self.target_net.cuda()
+
+    def learn(self):
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.args.lr)
+        self.buffer = replay_buffer(self.args.buffer_size)
+        self.exploration_schedule = linear_schedule(int(self.args.total_timesteps * self.args.exploration_fraction), self.args.final_ratio, self.args.init_ratio)
+        
         episode_reward = reward_recoder(self.env.robot_num)
         obs = self.env.reset(True)
         td_loss = 0
 
-        sub_folder = f"M_{self.args.map_size}x{self.args.map_size}_{str(self.timestamp)}"
-        self.model_path = os.path.join(self.model_path, sub_folder)
+        # Only stop 
+        pre_done = []
+        for i in range(obs.shape[0]):
+            pre_done.append(False)
         
         for timestep in range(int(self.args.total_timesteps)):
             explore_eps = self.exploration_schedule.get_value(timestep)
-            # import pdb; pdb.set_trace()
             with torch.no_grad():
                 obs_tensor = self._get_tensors(obs)
                 action_value = self.net(obs_tensor)
@@ -52,49 +72,72 @@ class dqn_agent:
             action = []
             for i in range(obs.shape[0]):
                 act = select_action(action_value[i], explore_eps)
-                action.append(act)
+                # action.append(act)
+
+                if pre_done[i]:
+                    action.append(0)
+                else:
+                    action.append(act)
+
             # import pdb; pdb.set_trace()
             if self.env.robot_num == 1:
                 action = [action]
-            reward, obs_, done, _ = self.env.step(action, True)
+            reward, obs_, done, info = self.env.step(action, True)
 
             # import pdb; pdb.set_trace()
 
 
             for i in range(len(obs)):
-                self.buffer.add(obs[i], action[i], reward[i], obs_[i], float(done[i]))
-                episode_reward.add_reward(reward[i],i)
+                if not pre_done[i]:
+                    self.buffer.add(obs[i], action[i], reward[i], obs_[i], float(done[i]))
+                    episode_reward.add_reward(reward[i],i)
             obs = obs_
             
-            done = np.array(done).any()
-            if done:
-                obs = np.array(self.env.reset())
-                writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
-                writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
-                writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
-                episode_reward.start_new_episode() 
+            # done = np.array(done).any()
+
+            if self.args.requireDoneAll:
+                done = np.array(done).all()
+            else:
+                done = np.array(done).any()
+
             
             if timestep > self.args.learning_starts and timestep % self.args.train_freq == 0:
                 batch_sample = self.buffer.sample(self.args.bath_size)
                 td_loss = self._update_network(batch_sample)
-                writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
+                self.writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
                 
             if timestep > self.args.learning_starts and timestep % self.args.target_network_update_freq == 0:
                 for param, target_param in zip(self.net.parameters(), self.target_net.parameters()):
                     target_param.data.copy_(self.args.tau * param.data + (1 - self.args.tau) * target_param.data)
                 # self.target_net.load_state_dict(self.net.state_dict())
-            
-            if done and episode_reward.num_episodes % self.args.display_interval == 0:
-                print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}'.format(datetime.datetime.now(), timestep, episode_reward.num_episodes, \
-                        episode_reward.mean, td_loss))
-                
-                model_name = f"/model_E_{episode_reward.num_episodes}_R_{round(episode_reward.mean)}_L_{round(td_loss)}.pt"
-                
-                if not os.path.exists(self.model_path):
-                    os.mkdir(self.model_path)
-                model_name = os.path.join(self.model_path, model_name)
 
-                torch.save(self.net.state_dict(), self.model_path + model_name)
+            if done:
+                obs = np.array(self.env.reset(True))
+                # Latest reward should be the mean of all agents termination reward average
+                latest_reward = episode_reward.latest_crossAgents
+                mean_reward = episode_reward.mean_crossAgents
+                num_reach_goal = info["num_reach_goal"]
+                avg_dist_to_goal = info["avg_dist_to_goal"]
+                self.writer.add_scalar("num_reach_goal", num_reach_goal, global_step=episode_reward.num_episodes)
+                self.writer.add_scalar("avg_dist_to_goal", avg_dist_to_goal, global_step=episode_reward.num_episodes)
+
+                self.writer.add_scalar("latest reward", latest_reward, global_step=episode_reward.num_episodes)
+                self.writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
+                self.writer.add_scalar("mean reward", mean_reward, global_step=episode_reward.num_episodes, walltime=None)
+                episode_reward.start_new_episode() 
+
+                if episode_reward.num_episodes % self.args.display_interval == 0:
+                    print('[{}] Frames: {}, Episode: {}, Mean: {:.3f}, Loss: {:.3f}'.format(datetime.datetime.now(), \
+                                                                                timestep, episode_reward.num_episodes, \
+                                                                                mean_reward, td_loss))
+                    
+                    model_name = f"/model_E_{episode_reward.num_episodes}_Suc_{num_reach_goal}_Dist_{round(avg_dist_to_goal)}_LR_{round(latest_reward)}_MR_{round(mean_reward)}_L_{round(td_loss)}.pt"
+                    
+                    if not os.path.exists(self.model_path):
+                        os.mkdir(self.model_path)
+                    model_name = os.path.join(self.model_path, model_name)
+
+                    torch.save(self.net.state_dict(), self.model_path + model_name)
 
 
     def render(self, random_level):
@@ -117,6 +160,11 @@ class dqn_agent:
         # self.model_path = os.path.join(self.model_path, sub_folder)
 
         explore_eps = random_level # 0 or 0.1
+
+        pre_done = []
+        for i in range(obs.shape[0]):
+            pre_done.append(False)
+
         
         for timestep in range(int(self.args.total_timesteps)):
             # explore_eps = self.exploration_schedule.get_value(timestep)
@@ -128,11 +176,16 @@ class dqn_agent:
             action = []
             for i in range(obs.shape[0]):
                 act = select_action(action_value[i], explore_eps)
-                action.append(act)
+                if pre_done[i]:
+                    action.append(0)
+                else:
+                    action.append(act)
             # import pdb; pdb.set_trace()
             if self.env.robot_num == 1:
                 action = [action]
             reward, obs_, done, _ = self.env.step(action, True)
+
+            pre_done = done
 
             # import pdb; pdb.set_trace()
 
@@ -142,21 +195,28 @@ class dqn_agent:
                 episode_reward.add_reward(reward[i],i)
             obs = obs_
             
-            done = np.array(done).any()
+            if self.args.requireDoneAll:
+                done = np.array(done).all()
+            else:
+                done = np.array(done).any()
+
             if done:
                 obs = np.array(self.env.reset(True))
-                writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
-                writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
-                writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
-                episode_reward.start_new_episode() 
+                # self.writer.add_scalar("latest reward", np.mean(episode_reward.latest), global_step=episode_reward.num_episodes)
+                # self.writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
+                # self.writer.add_scalar("AVERAGE mean reward", episode_reward.mean/episode_reward.get_length, global_step=episode_reward.num_episodes, walltime=None)
+                # episode_reward.start_new_episode() 
 
-                print(f"latest reward: {episode_reward.latest[0]}, {explore_eps}, mean reward: {episode_reward.mean}")
+                # print(f"latest reward: {episode_reward.latest}, {explore_eps}, AVERAGE mean reward: {episode_reward.mean/episode_reward.get_length}")
 
+                input("Press Enter to continue...")
+
+                # exit()
             
             # if timestep > self.args.learning_starts and timestep % self.args.train_freq == 0:
             #     batch_sample = self.buffer.sample(self.args.bath_size)
             #     td_loss = self._update_network(batch_sample)
-            #     writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
+            #     self.writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
                 
             # if timestep > self.args.learning_starts and timestep % self.args.target_network_update_freq == 0:
             #     for param, target_param in zip(self.net.parameters(), self.target_net.parameters()):
@@ -209,15 +269,15 @@ class dqn_agent:
     #         done = np.array(done).any()
     #         if done:
     #             obs = np.array(self.env.reset())
-    #             writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
-    #             writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
-    #             writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
+    #             self.writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
+    #             self.writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
+    #             self.writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
     #             episode_reward.start_new_episode() 
             
     #         if timestep > self.args.learning_starts and timestep % self.args.train_freq == 0:
     #             batch_sample = self.buffer.sample(self.args.bath_size)
     #             td_loss = self._update_network(batch_sample)
-    #             writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
+    #             self.writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
                 
     #         if timestep > self.args.learning_starts and timestep % self.args.target_network_update_freq == 0:
     #             for param, target_param in zip(self.net.parameters(), self.target_net.parameters()):
@@ -270,15 +330,15 @@ class dqn_agent:
             if done:
                 obs = np.array(self.env.reset(True))
                 obs = [obs[0]]
-                writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
-                writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
-                writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
+                self.writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
+                self.writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
+                self.writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
                 episode_reward.start_new_episode() 
             
             if timestep > self.args.learning_starts and timestep % self.args.train_freq == 0:
                 batch_sample = self.buffer.sample(self.args.bath_size)
                 td_loss = self._update_network(batch_sample)
-                writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
+                self.writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
                 
             if timestep > self.args.learning_starts and timestep % self.args.target_network_update_freq == 0:
                 for param, target_param in zip(self.net.parameters(), self.target_net.parameters()):
@@ -346,9 +406,9 @@ class dqn_agent:
             if done:
                 obs = np.array(self.env.reset(True))
                 obs = [obs[0]]
-                writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
-                writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
-                writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
+                self.writer.add_scalar("latest reward",episode_reward.latest[0], global_step=episode_reward.num_episodes)
+                self.writer.add_scalar("random exploration",explore_eps,global_step=episode_reward.num_episodes)
+                self.writer.add_scalar("mean reward", episode_reward.mean, global_step=episode_reward.num_episodes, walltime=None)
                 episode_reward.start_new_episode() 
 
                 print(f"latest reward: {episode_reward.latest[0]}, {explore_eps}, mean reward: {episode_reward.mean}")
@@ -356,7 +416,7 @@ class dqn_agent:
             # if timestep > self.args.learning_starts and timestep % self.args.train_freq == 0:
             #     batch_sample = self.buffer.sample(self.args.bath_size)
             #     td_loss = self._update_network(batch_sample)
-            #     writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
+            #     self.writer.add_scalar("loss", td_loss, global_step=timestep, walltime=None)
                 
             # if timestep > self.args.learning_starts and timestep % self.args.target_network_update_freq == 0:
             #     for param, target_param in zip(self.net.parameters(), self.target_net.parameters()):

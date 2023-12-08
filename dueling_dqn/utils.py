@@ -58,7 +58,15 @@ class reward_recoder:
     
     @property
     def mean(self):
-        return np.mean(np.array(self.buffer[0]))
+        return [np.mean(np.array(i)) for i in self.buffer]
+    
+    @property
+    def mean_crossAgents(self):
+        return np.mean(np.array(self.mean))
+    
+    @property
+    def latest_crossAgents(self):
+        return np.mean(np.array(self.latest))
     
     @property
     def latest(self):

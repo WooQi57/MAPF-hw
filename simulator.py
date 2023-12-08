@@ -36,7 +36,10 @@ class Simulator:
 
         # Handel the map_reset at th most begining to reproduce the later training procedure
         rnd = np.random
-        rnd.seed(5457)
+        if self.args.save_gif != None:
+            rnd.seed(self.args.vis_seed)
+        else:
+            rnd.seed(5457)
         if len(self.robot) == 0:
             pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
             pos = set([tuple(i) for i in pos])
@@ -66,46 +69,28 @@ class Simulator:
         """
         generate random map to increase the complexity
         """
-        # rnd = np.random
-        # rnd.seed(5457)
         assert size[0]*size[1]>robot_num *scale*3
         for i in range(1,size[0]//scale):
             cv2.line(self.canvas, (scale*i,scale), (scale*i,(size[1]//scale-1)*scale), (0,0,0))
         for i in range(1,size[1]//scale):
             cv2.line(self.canvas, (scale,i*scale), ((size[0]//scale-1)*scale,i*scale), (0,0,0))
-        # if len(self.robot) == 0:
-        #     pos = rnd.randint(1,size[0]//scale, size=(3*robot_num,2))
-        #     pos = set([tuple(i) for i in pos])
-        #     while len(pos) < 3*robot_num:
-        #         temp = rnd.randint(1,size[0]//scale, size=(3*robot_num - len(pos),2))
-        #         b = set([tuple(i) for i in temp])
-        #         for i in b:
-        #             if i not in pos:
-        #                 pos.add(i)
-        #     pos = list(pos)
-        #     for i in range(robot_num):
-        #         self.robot[i] = (pos[i][0],pos[i][1],i)
-        #         self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+2*robot_num][0], pos[i+2*robot_num][1])
-        
-        # assert len(self.robot) > 0, "You should have len(self.robot) > 0"
-
         if len(self.robot) == 0:
             pos = self.fix_pos
             for i in range(robot_num):
                 self.robot[i] = (pos[i][0],pos[i][1],i)
-                self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+2*robot_num][0], pos[i+2*robot_num][1])
+                # self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+2*robot_num][0], pos[i+2*robot_num][1])
+                self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1], pos[i+robot_num][0], pos[i+robot_num][1])
+
 
 
         for i in range(robot_num):
             self.draw_target(self.canvas, np.array(self.target[i][2:])*scale, self.colours[i+len(self.robot)], 5)
             self.robot_carry[i] = False    
 
-        # reset rnd seed for the later training portion
 
         if self.args.reset_seed_inprocess:
-            # print("here")
-            rnd.seed(int(time.time()))
-            # exit()
+            # reset rnd seed for the later training portion
+            np.random.seed(int(time.time()))
 
     @staticmethod
     def assign_colour(num):
@@ -127,7 +112,7 @@ class Simulator:
         cv2.line(frame, tuple(point3), tuple(point4), color, thick)
 
 
-    def show(self, wait=True):
+    def show(self, wait=True, on_server=False):
         frame = deepcopy(self.canvas)
         font_scale = 1
         font_size = 0.4
@@ -141,6 +126,10 @@ class Simulator:
             cv2.circle(frame, tuple(np.array(pos)[:-1]*scale), scale//3, self.colours[id_], -1)
             cv2.putText(frame,'{0}'.format(pos[-1]),tuple([pos[0]*scale-size[0]//2, pos[1]*scale+size[1]//2]),cv2.FONT_HERSHEY_COMPLEX,font_size,color,font_scale)
         
+        if on_server:
+            self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            return
+            
         cv2.imshow("Factory"+self.name,frame)
         if wait:
             cv2.waitKey(0)
@@ -148,41 +137,7 @@ class Simulator:
             cv2.waitKey(100)
         self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     
-    def get_state_map(self, index, show=False):
-        if self.no_vis:
-            show=False
-        state = np.zeros((self.size[0]//scale+1, self.size[1]//scale+1))
-        for id_, pos in self.robot.items():
-            if id_ == index:
-                state[pos[0]][pos[1]] = -1
-            else:
-                state[pos[0]][pos[1]] -= -3
-        for id2_, pos2 in self.target.items():
-            if id2_ == self.robot[index][2]:
-                if not self.robot_carry[id_]:
-                    if state[pos2[0]][pos2[1]] == -1:
-                        self.robot_carry[id_] = True
-                        state[pos2[0]][pos2[1]] = 2
-                    else:
-                        state[pos2[0]][pos2[1]] += 4
-                else:
-                    state[pos2[2]][pos2[3]] += 4
-        state = np.rot90(state, 1)
-        # state = state[1:,:-1]
-        # state = state[::-1]
-        if show:
-            # self.show()
-            plt.figure()
-            plt.imshow(state)
-            for i in range(len(state)):
-                for j in range(len(state[0])):
-                    c = str(state[i][j])
-                    plt.text(j, i, c, va='center', ha='center')
-            plt.xlim((-0.5,len(state[0])-0.5))
-            plt.ylim((-0.5,len(state)-0.5))
-            plt.show()
-        return np.array([state])
-    
+
     @staticmethod
     def out_of_map(pos, size):
         if pos[0] <= 0 or pos[0] >= size[0]//scale or pos[1] <= 0 or pos[1] >= size[1]//scale:
@@ -192,77 +147,78 @@ class Simulator:
     def step(self, action, simple=False):
         path = {}
         reward = np.array([-0.3 for i in action])
-        done = [False for i in action]
+        import copy
+        if self.steps == 0:
+            done = [False for i in action]
+            prev_dist_list = [100 for i in action]
+            self.reach_goal = [0 for i in action]
+        else:
+            done = copy.deepcopy(self.pre_done)
+            prev_dist_list = self.prev_dist_list
+        # done = [False for i in action]
         states = []
         end = {}
 
-        prev_dist_list = [0.0 for i in action]
-
-
-        expected_length = 2 * self.args.map_size
-        # if False:
-        #     gain = 0.01
-        #     loss = 0.4
-        # else:
-        #     gain = 0.4
-        #     loss = 0.2
-
-        
-        gain = 0
-        loss = 0
+        if self.args.oldReward:
+            gain = 0.4
+            loss = 0.2
+        else:
+            gain = 1
+            loss = 5
 
 
         for id_, pos in self.robot.items():
-            pos2 = self.target[pos[2]]
-            end[id_] = (pos2[0], pos2[1])
-            if (pos[0]-pos2[0])**2 + (pos[1]-pos2[1])**2 < 1:
-                self.robot_carry[id_] = True
-                
-                end[id_] = (pos2[2], pos2[3])
-            if action[id_] == 0:
-                path[id_] = [(pos[0], pos[1])]
-                reward[id_] -= 0.2
-            elif action[id_] == 1:
-                path[id_] = [(pos[0], pos[1]+1)]
-                if end[id_][1] - pos[1] > 0:
-                    reward[id_] += gain
-                else:
-                     reward[id_] -= loss
-            elif action[id_] == 2:
-                path[id_] = [(pos[0]-1, pos[1])]
-                if end[id_][0] - pos[0] < 0:
-                    reward[id_] += gain
-                else:
-                     reward[id_] -= loss
-            elif action[id_] == 3:
-                path[id_] = [(pos[0]+1, pos[1])]
-                if end[id_][0] - pos[0] > 0:
-                    reward[id_] += gain
-                else:
-                     reward[id_] -= loss
-            elif action[id_] == 4:
-                path[id_] = [(pos[0], pos[1]-1)]
-                if end[id_][1] - pos[1] < 0:
-                    reward[id_] += gain
-                else:
-                     reward[id_] -= loss
-            if self.out_of_map(path[id_][0], self.size):
-                reward[id_] -= 20
+            # Terminated too long episode
+            if self.steps > self.expected_length:
                 done[id_] = True
-                # print("out of map!!!")
 
-            dist = abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1])
+            # Update the path for each robot with the action = [1, 2, 3, 4]
+            if not done[id_]: 
+                pos2 = self.target[pos[2]]
+                end[id_] = (pos2[0], pos2[1])
 
-            prev_dist_list[id_] = dist
+                if (pos[0]-pos2[0])**2 + (pos[1]-pos2[1])**2 < 1:
+                    reward[id_] += 50
+                    # path[id_] = [(pos[0], pos[1])]
+                    done[id_] = True
+                    continue
 
+                # action==0: stay still
+                if action[id_] != 0:
+                    if action[id_] == 1:
+                        path[id_] = [(pos[0], pos[1]+1)]
+                    elif action[id_] == 2:
+                        path[id_] = [(pos[0]-1, pos[1])]
+                    elif action[id_] == 3:
+                        path[id_] = [(pos[0]+1, pos[1])]
+                    elif action[id_] == 4:
+                        path[id_] = [(pos[0], pos[1]-1)]
+                    
+                    if self.out_of_map(path[id_][0], self.size):
+                        reward[id_] -= 20
+                        done[id_] = True
+                    
+                        # Remove the path[id_] if it is out of map
+                        del path[id_]
 
-            if self.steps > expected_length:
-                reward[id_] -= 10
-                done[id_] = True
+                    dist = abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1])
+
+                    prev_dist_list[id_] = dist
+            else:
+                continue
 
 
         self.steps += 1
-        self.start(path, None, False)
+
+        if path != {}:
+            if self.args.save_gif != None:
+                self.start(path, self.args.save_gif, False)
+            else:
+                self.start(path, None, False)
+
+
+        # IMPORTANT
+        self.crash_check()
 
         # Post Step
         if len(self.crash) > 0:
@@ -273,42 +229,135 @@ class Simulator:
                 reward[i[1]] -= 20
                 done[i[0]] = True
                 done[i[1]] = True
+        
         for id_ in self.robot.keys():
-            if simple == False:
-                state = self.get_state_map(id_, False)
+            # NOTE: USE THIS BRANCH
+            # state = self.simple_state(id_)
+
+            if self.args.expand_obs:
+                state = self.expand_state(id_)
+                # state = state[:7]
             else:
-                # NOTE: USE THIS BRANCH
-                state = self.simple_state(id_, False)
+                state = self.simple_state(id_)
+
+
             states.append(state)
 
+            if not done[id_]: 
+                dist = abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1])
+                prev_dist_list[id_] = dist
 
-            dist = abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1])
+                dist_change = prev_dist_list[id_] - dist
+                if dist_change > 0:
+                    reward[id_] += gain
+                else:
+                    reward[id_] -= loss
 
-            step_reward = 0
-            dist_change = prev_dist_list[id_] - dist
-            if dist_change > 0:
-                step_reward += 1
-            else:
-                step_reward -= 5
-                
-            # step_reward = 0.5 * (prev_dist_list[id_] - dist)
-            # input("debug step...")
+                if np.math.hypot(self.robot[id_][0]-end[id_][0], self.robot[id_][1]-end[id_][1])<1:
+                    # reward[id_] += 30
+                    reward[id_] += 50
 
+                    self.reach_goal[id_] = 1
 
-            reward[id_] += step_reward
+                    done[id_] = True
+                    if not self.no_vis:
+                        print("robot", id_, "reach the target")
 
+        self.pre_done = done
+        self.prev_dist_list = prev_dist_list
 
-            # reward[id_] -= 0.025*(abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1]))
-            if np.math.hypot(self.robot[id_][0]-end[id_][0], self.robot[id_][1]-end[id_][1])<1:
-                reward[id_] += 30
-                done[id_] = True
-                # input("wait..")
-                if self.args.moveAll:
-                    print("reach_goal!!!")
-                reward[id_] += 0.25 *  (expected_length - self.steps) ** 2
-        
-        return reward, np.array(states), done, {}
+        info = {"num_reach_goal": np.sum(self.reach_goal),
+                "crash": self.crash,
+                "avg_dist_to_goal": np.sum(self.prev_dist_list),
+                }
+
+        return reward, np.array(states), done, info
     
+
+    def expand_state(self, index, test=False):
+        me = self.robot[index]
+        state = np.zeros(7+8) # 2 + 4 + 1 + [4 (2xstep) + 4(corner) only consider robots!]
+
+        state[0] = (self.target[self.robot[index][2]][0] - self.robot[index][0])/(self.size[0]//scale+1)
+        state[1] = (self.target[self.robot[index][2]][1] - self.robot[index][1])/(self.size[1]//scale+1)
+
+        if me[0] == 1:
+            # left
+            state[2] = 1
+        elif me[0] == self.size[0]//scale-1:
+            # right
+            state[3] = 1
+        if me[1] == 1:
+            # up
+            state[4] = 1
+        elif me[1] == self.size[1]//scale-1:
+            # down
+            state[5] = 1
+
+        # Has terminated
+        if self.out_of_map(me, self.size):
+            state[6] = 1
+        
+        for id_, pos in self.robot.items():
+            # 2 + 4 + 1 + [4 (2xstep) + 4(corner) only consider robots!]
+            if id_ == index:
+                continue
+
+            manhaton_dist = abs(self.robot[id_][0]-me[0])+abs(self.robot[id_][1]-me[1])
+
+            # import pdb; pdb.set_trace()
+
+            if manhaton_dist <= 2:
+                left = (self.robot[id_][0]-me[0] == -1)
+                right = (self.robot[id_][0]-me[0] == 1)
+                up = (self.robot[id_][1]-me[1] == -1)
+                down = (self.robot[id_][1]-me[1] == 1)
+
+                left_2  = (self.robot[id_][0]-me[0] == -2)
+                right_2 = (self.robot[id_][0]-me[0] == 2)
+                up_2    = (self.robot[id_][1]-me[1] == -2)
+                down_2  = (self.robot[id_][1]-me[1] == 2)
+
+            if manhaton_dist == 0:
+                state[6] = 1
+
+            if manhaton_dist == 1:
+                start_from = 2
+                if left:
+                    state[start_from+0] = 1    # left
+                elif right:
+                    state[start_from+1] = 1    # right
+                elif up:
+                    state[start_from+2] = 1    # up
+                elif down:
+                    state[start_from+3] = 1     # down                
+
+            elif manhaton_dist == 2:
+                start_from = 2+4+1
+
+                if left_2:
+                    state[start_from+0] = 1    # left_2
+                elif right_2:
+                    state[start_from+1] = 1    # right
+                elif up_2:
+                    state[start_from+2] = 1    # up
+                elif down_2:
+                    state[start_from+3] = 1     # down    
+
+                start_from = 2+4+1+4
+
+                if left and up:
+                    state[start_from+0] = 1    # left and up
+                elif left and down:
+                    state[start_from+1] = 1    # left and down
+                elif right and up:
+                    state[start_from+2] = 1    # right and up
+                elif right and down:
+                    state[start_from+3] = 1    # right and down
+
+        return state
+
+
     def simple_state(self, index, test=False):
         me = self.robot[index]
         state = np.zeros(7)
@@ -352,6 +401,8 @@ class Simulator:
         return state
 
     def reset(self, simple=False):
+        self.expected_length = 2 * self.args.map_size
+
         self.crash = []
         self.canvas = np.ones(self.size, np.uint8)*255
         self.robot = {}
@@ -362,10 +413,13 @@ class Simulator:
         self.frames = []
         self.generate_map(self.robot_num, self.size)
         for id_ in self.robot.keys():
-            if simple == True:
-                state = self.simple_state(id_)
+
+            if self.args.expand_obs:
+                state = self.expand_state(id_)
+                # state = state[:7]
             else:
-                state = self.get_state_map(id_)
+                state = self.simple_state(id_)
+                
             self.robot_carry[id_] = False
             states.append(state)
         return np.array(states)
@@ -383,10 +437,10 @@ class Simulator:
                 # print(lastmiddle, lastmiddle1, np.math.hypot(lastmiddle1[0]-lastmiddle[0],lastmiddle1[1]-lastmiddle[1]))
                 if np.math.hypot(pos[0]-pos2[0], pos[1]-pos2[1]) < 1 or np.math.hypot(lastmiddle1[0]-lastmiddle[0],lastmiddle1[1]-lastmiddle[1])<=0.5:
                     self.crash.append((id_,id2_))
-                    if np.math.hypot(pos[0]-pos2[0], pos[1]-pos2[1]) < 1:
-                        print(f"fucking robot crash{id_}:{pos},{id2_}:{pos2}")
-                    else:
-                        print("fucking lastmiddle crash")
+                    # if np.math.hypot(pos[0]-pos2[0], pos[1]-pos2[1]) < 1:
+                    #     # print(f"fucking robot crash{id_}:{pos},{id2_}:{pos2}")
+                    # else:
+                    #     # print("fucking lastmiddle crash")
                     return True
         return False
     
@@ -432,18 +486,27 @@ class Simulator:
                         cv2.waitKey(1000)
                         break    
                     self.show(wait)
+                else:
+                    self.show(wait, on_server=True)
 
                 i += 1
                 if i >= max([len(i) for i in path.values()]):
+                    # input("here!!!!")
+                    # import pdb; pdb.set_trace()
                     # print("over")
                     break
         except Exception as err:
             print(err)
+            # print()
         if save_gif!=None:
-            with imageio.get_writer("./image/"+save_gif, mode="I") as writer:
+            with imageio.get_writer(save_gif, fps=1, mode="I") as writer:
+
+            # with imageio.get_writer("./image/"+save_gif, fps=1, mode="I") as writer:
                 for idx, frame in enumerate(self.frames):
                     writer.append_data(frame)
-        cv2.waitKey(1)
+    
+        if not self.no_vis:
+            cv2.waitKey(1)
         # cv2.destroyAllWindows()
 
 
