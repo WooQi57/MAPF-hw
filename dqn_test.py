@@ -57,7 +57,17 @@ def main():
     model = dqn_agent(env, actions_per_robot, num_robots, observation_per_robot*num_robots,args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
-        model.load_dict(model_path+"/model_32000.pt")
+        # model.load_dict(model_path+"/model_later_stage_102000.pt")
+        # model.load_dict(model_path+"/model_early_stage_44000.pt")
+        # model.load_dict(model_path+"/model_older_stage_128000.pt")
+        # model.load_dict(model_path+"/model_advanced_stage_82000.pt")
+        # model.load_dict(model_path+"/model_teenage_stage_58000.pt")
+        # model.load_dict(model_path+"/model_baby_stage_30000.pt")
+        model.load_dict(model_path+"/model_2000.pt")
+
+
+
+
 
     obs = env.reset()
     done = False
