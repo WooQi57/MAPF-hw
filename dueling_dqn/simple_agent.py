@@ -18,7 +18,7 @@ torch.set_default_device('cuda')
 class dqn_agent:
     def __init__(self, env, actions_per_robot, num_robots, num_observation ,args):
         self.env = env
-        self.net = simplenet(actions_per_robot*num_robots, num_observation)
+        self.net = simplenet(actions_per_robot**num_robots, num_observation)
         self.actions_per_robot = actions_per_robot
         self.num_robots = num_robots
         self.args = args
@@ -170,8 +170,8 @@ class dqn_agent:
 
             # Enumerate robot and compute data point for fitting
             # Q(s,a):  s: a large observation; a: action (0-actions_per_robot*num_robots-1) Q: reward for robot corresponding to action
-            action_id = action[0]+action[1]*self.actions_per_robot+action[1]*self.actions_per_robot**2  # TODO 改进制
-            self.buffer.add(obs[0], action_id, reward[0], obs_[0], done)# TODO done? done_arr  
+            action_id = action[0]+action[1]*self.actions_per_robot+action[2]*self.actions_per_robot**2  # TODO 改进制
+            self.buffer.add(obs[0], action_id, reward, obs_[0], float(done))# TODO done? done_arr  
             # TODO change action to an array of actions_per_robot^num_robots
             # TODO change reward to a single scalar
             # TODO change done to a single scalar

@@ -35,11 +35,11 @@ if __name__ == "__main__":
     # random exploration final ratio
     parser.add_argument("--final_ratio", default=0.1, type=float)
     # max time steps
-    parser.add_argument("--total_timesteps", default=5e7, type=int)  #5e5
+    parser.add_argument("--total_timesteps", default=5e5, type=int)  #5e5
     # save dir
     parser.add_argument("--save_dir", default='./models', type=str)
     # save model frequency
-    parser.add_argument("--display_interval", default=5_000, type=int)
+    parser.add_argument("--display_interval", default=2_000, type=int)
     # load model to continue
     parser.add_argument("--load_model", default=False, type=bool)
     # number of robots
@@ -49,11 +49,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     num_robots = args.num_robots
-    actions_per_robot = 5
+    actions_per_robot = 2
     env = Simulator((35*args.map_size+1,35*args.map_size+1,3),num_robots)  # 601
     observation_per_robot = env.observation_per_robot
     model = dqn_agent(env, actions_per_robot, num_robots, observation_per_robot*num_robots,args)
     if args.load_model:
         model_path = os.path.join(args.save_dir, args.env_name)
         model.load_dict(model_path+"/model_152000.pt")
-    model.learn_one()
+    model.learn_fixed_path()

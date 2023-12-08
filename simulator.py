@@ -6,7 +6,7 @@ from copy import deepcopy
 import imageio
 from matplotlib import pyplot as plt
 import time
-
+# from AStarPlanner import AStarPlanner
 scale = 35
 
 class Simulator:
@@ -24,7 +24,7 @@ class Simulator:
         self.robot_carry = dict()
         self.size = size
         self.robot_num = robot_num
-        self.observation_per_robot = 7
+        self.observation_per_robot = 5
         self.frames = []
         self.name = name
         self.steps = 0
@@ -35,6 +35,11 @@ class Simulator:
         self.generate_map(robot_num, size)    
         self.visual = visual
         self.debug = debug
+        # self.obstacles = {(2, 2), (3, 3), (4, 4)}  # Example obstacle positions
+        self.obstacles = {}
+        self.path_set = self.get_path_set(AStar=False) # get path set for each robot without using A*
+        self.path_length = {key:len(value) for key,value in self.path_set.items()}
+
         # cv2.namedWindow("Factory")
         # cv2.resizeWindow('Factory', tuple(np.array(list(size)[:2])+np.array([500,200])))
     
@@ -150,44 +155,39 @@ class Simulator:
         return False
 
     def step(self, action):
+        '''
+        New version: follow pre_planned path
+        '''
         # print(f"action:{action}")
         next_pos = {}
         reward = np.array([-0.3 for i in action])
         reached_goal = [False for i in range(self.robot_num)]
         collision = [False for i in range(self.robot_num)]
-        out_bound = [False for i in range(self.robot_num)]
+        # out_bound = [False for i in range(self.robot_num)]
         done_arr = np.array([False for i in range(self.robot_num+1)])  # last entry is for completely done signal, first robot_num entries for each robot's termination
         target_pos = {}
         self.robot_last_pos = self.robot.copy()
+        self.path_length = {key:len(value) for key,value in self.path_set.items()} ## used in reset
+        self.last_path_step = self.path_step.copy()
 
         # step simulation
         for id_, pos in self.robot.items():
             # take no action if reached the goal
-            if action[id_] == 0:
-                next_pos[id_] = [(pos[0], pos[1])]
-            elif action[id_] == 1:
-                next_pos[id_] = [(pos[0], pos[1]+1)]
-            elif action[id_] == 2:
-                next_pos[id_] = [(pos[0]-1, pos[1])]
-            elif action[id_] == 3:
-                next_pos[id_] = [(pos[0]+1, pos[1])]
-            elif action[id_] == 4:
-                next_pos[id_] = [(pos[0], pos[1]-1)]
-
-            if self.robot_last_pos[id_][:2]==self.target[id_][:2]:
-                next_pos[id_] = [(pos[0], pos[1])]
-
-            # check if out of map
-            if self.out_of_map(next_pos[id_][0],self.size):
-                out_bound[id_] = True
-                next_pos[id_] = [(pos[0], pos[1])]
+            if (action[id_] == 0) | (self.robot_last_pos[id_][:2]==self.target[id_][:2]): # stay
+                # self.path_step[id_] += 0
+                next_pos[id_] = [self.path_set[id_][int(self.path_step[id_])]]
+            elif action[id_] == 1: # follow path next step
+                self.path_step[id_] = min(self.path_step[id_]+1, self.path_length[id_])
+                next_pos[id_] = [self.path_set[id_][int(self.path_step[id_])]]
 
             self.robot[id_] = tuple(np.append(np.array(next_pos[id_][0]),self.robot[id_][2]))  
 
             # check if reached goal
-            _pos = self.target[id_]
-            target_pos[id_] = (_pos[0], _pos[1])
-            if math.hypot(self.robot[id_][0]-target_pos[id_][0], self.robot[id_][1]-target_pos[id_][1])<1:
+                # _pos = self.target[id_]
+                # target_pos[id_] = (_pos[0], _pos[1])
+                # if math.hypot(self.robot[id_][0]-target_pos[id_][0], self.robot[id_][1]-target_pos[id_][1])<1:
+                #     reached_goal[id_] = True
+            if self.robot_last_pos[id_][:2]==self.target[id_][:2]:
                 reached_goal[id_] = True
 
 
@@ -198,8 +198,8 @@ class Simulator:
         collision = self.collision_check(next_pos)
         done_arr[:-1] = np.array(collision) # or np.array(out_bound).any()  # wqwqwq
 
-        obs = self.compute_obs(collision,out_bound,reached_goal)
-        reward = self.compute_reward(action,collision,out_bound,reached_goal)
+        obs = self.compute_obs(collision,reached_goal)
+        reward = self.compute_reward(action,collision,reached_goal)
         self.steps += 1
         if self.steps > 80/4:
             done_arr[:-1] = done_arr[:-1] | (1-np.array(reached_goal))
@@ -211,61 +211,117 @@ class Simulator:
 
         if self.visual:
             self.show_plot(next_pos, done, None, wait=self.debug)
-        return reward, np.array(obs), done_arr, {}
+        # return reward, np.array(obs), done_arr, {}
+        return reward, np.array(obs), done, {}
     
-    def compute_obs(self,collision,out_bound,reached_goal):
+        # Path planning for each robot
+    def get_path_set(self, AStar=False):
+        path_set = {}
+        
+        # if AStar:# if using astar_planning, call the A* algorithm
+            # astar = AStarPlanner(self.size[0], self.size[1], self.obstacles)
+            # for id_, pos in self.robot.items():
+            #     path_set[id_] = astar.astar(self.init_robot[id_][0], self.init_robot[id_][1],
+            #                     self.init_target[id_][0], self.init_target[id_][1], [], [])
+        # else:# if using naive planning, call the naive planning algorithm
+        for id_, pos in self.robot.items():
+            path_set[id_] = self.naive_planning(self.init_robot[id_][0], self.init_robot[id_][1],
+                            self.init_target[id_][0], self.init_target[id_][1])
+
+        return path_set
+
+    def naive_planning(self, sx, sy, gx, gy, ox=[], oy=[]):
+        """
+        sx: start x position 
+        sy: start y position
+        gx: goal x position
+        gx: goal x position
+        ox: x position list of Obstacles 
+        oy: y position list of Obstacles 
+        """
+        # Define current position 
+        pos = (sx, sy)
+        path = []
+        path.append(pos)
+        while pos != (gx, gy):
+            if pos[0] < gx:
+                pos = (pos[0]+1, pos[1])
+                path.append(pos)
+                continue
+            elif pos[0] > gx:
+                pos = (pos[0]-1, pos[1])
+                path.append(pos)
+                continue
+            elif pos[1] < gy:
+                pos = (pos[0], pos[1]+1)
+                path.append(pos)
+                continue
+            elif pos[1] > gy:
+                pos = (pos[0], pos[1]-1)
+                path.append(pos)
+                continue
+
+        # teromere_x = np.sign(sx - gx)
+        # teromere_y = np.sign(sy - gy)
+        # path.append((pos[0] + teromere_x, pos[1] + (1 - teromere_x ** 2) * teromere_y))
+
+        return path
+
+    def compute_obs(self,collision,reached_goal):
         obs=[]
         for id_, pos in self.robot.items():
-            state = np.zeros(self.observation_per_robot)
-            state[:2] = self.target[id_]
-            state[2:4] = pos[:2]
-            state[4] = int(collision[id_])
-            state[5] = np.min([pos[0],-pos[0]+self.size[0]//scale,pos[1],-pos[1]+self.size[1]//scale])
-            state[6] = abs(self.target[id_][0] - pos[0])+abs(self.target[id_][1] - pos[1])
+            state = np.zeros(self.observation_per_robot) # -> 5
+            state[0] = int(collision[id_]) # collision -> 1, no collision -> 0
+            state[1] = self.path_step[id_]/self.path_length[id_] # path progress
+            state[2] = max(0, (self.last_path_step[id_])/self.path_length[id_]) # previous path progress
+            state[3] = min((self.path_step[id_]+1)/self.path_length[id_], 1) # next path progress if move forward
+            state[4] = int(reached_goal[id_]) # reached goal -> 1, not reached -> 0
+            
             obs.append(state)
+
+        # self.observation_per_robot = len(state) # observation length
         if self.debug:
             print(f"state: {obs}")
         return [np.array(obs).ravel()]
     
-    def compute_reward(self,action,collision,out_bound,reached_goal):
+    def compute_reward(self,action,collision,reached_goal):
         if self.debug:
             print(f"action:{action}")
         reward = np.zeros(self.robot_num)
         for id_, pos in self.robot.items():
             # reward for correct action
             target_pos = self.target[id_]
-            prev_pos = self.robot_last_pos[id_][:2]
-            if self.robot_last_pos[id_][:2]==target_pos[:2]:
-                if action[id_] == 0:
-                    reward[id_] += 3
+            if (reached_goal[id_]) | (self.robot_last_pos[id_][:2]==target_pos[:2]): # prefer to stay if reached the goal
+                if action[id_] == 0: 
+                    reward[id_] += 11
             if action[id_] == 0:  # stay
-                reward[id_] -= 3
-            elif action[id_] == 1:  # down
-                reward[id_] += -1.5 + (target_pos[1] - prev_pos[1] > 0) * 2
-            elif action[id_] == 2:  # left
-                reward[id_] += -1.5 + (target_pos[0] - prev_pos[0] < 0) * 2
-            elif action[id_] == 3:  # right
-                reward[id_] += -1.5 + (target_pos[0] - prev_pos[0] > 0) * 2
-            elif action[id_] == 4:  # up
-                reward[id_] += -1.5 + (target_pos[1] - prev_pos[1] < 0) * 2
+                reward[id_] += -1
+            elif action[id_] == 1:  # move to the next position in the pre-planned path
+                reward[id_] += 1.5
             
-            if self.debug:
-                print(f"reward after action check:{reward}")
+            if self.path_step[id_] <= 0 | self.path_step[id_] >= self.path_length[id_]: # if the robot is out of the path
+                reward[id_] += -60
+
             # reward for goal
             if reached_goal[id_]:
                 # print(f"robot {id_} reached the goal and gets rewards")
-                reward[id_]+=10
-            else:
-                reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/(self.size[0]//scale)
+                reward[id_] += 10
+            # else:
+                ## reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8 #?????  why 8 ????? why size[0] 
+                # reward[id_]+=-(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))/self.size[0] + 8
+                # reward[id_] += - 2*(path_length[id_] - self.last_path_step[id_]) / path_length[id_] ### new
 
             # reward for collision and out of map
-            if collision[id_] or out_bound[id_]:
-                reward[id_] -= 20
+            if collision[id_] :
+                reward[id_] -= 40
+
 
             if self.debug:
                 print(f"after reward for goal:{reward} {(abs(target_pos[0] - pos[0])+abs(target_pos[1] - pos[1]))}")
 
-        return reward
+        total_reward = np.sum(reward)
+
+        return total_reward
 
     def collision_check(self,path):
         collision = [False for _ in range(self.robot_num)]
@@ -298,6 +354,7 @@ class Simulator:
                     writer.append_data(frame)
         cv2.waitKey(1)
 
+    '''
     def simple_state(self, index, test=False):
         me = self.robot[index]
         state = np.zeros(7)
@@ -333,6 +390,7 @@ class Simulator:
                 if self.robot[id_][0]-me[0] == 0 and self.robot[id_][1]-me[1] == 0:
                     state[6] = 1
         return state
+    '''
 
     def reset(self):
         self.crash = []
@@ -344,6 +402,7 @@ class Simulator:
         self.frames = []
         # self.generate_map(self.robot_num, self.size)
 
+        self.path_step = np.zeros((self.robot_num), dtype=int)
         # reset canvas
         self.canvas = np.ones(self.size, np.uint8)*255
         if self.visual:
@@ -418,6 +477,7 @@ class Simulator:
                     writer.append_data(frame)
         cv2.waitKey(1)
 
+    '''
     def stepold(self, action, simple=False):
         path = {}
         reward = np.array([-0.3 for i in action])
@@ -481,7 +541,8 @@ class Simulator:
                 done[id_] = True
 
         return reward, np.array(states), done, {}
- 
+    '''
+    
 if __name__ == "__main__":
     # random initialize
     # env1 = Simulator((601,601,3),8)
