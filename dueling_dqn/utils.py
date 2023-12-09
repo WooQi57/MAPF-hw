@@ -49,7 +49,7 @@ def select_action(action_value, explore_eps, actions_per_robot=2):
         action = np.array(list(action2), dtype=int)
     else:
         # print("explore")
-        action = np.random.randint(0,actions_per_robot,len(action_value))
+        action = np.random.randint(0,actions_per_robot,3)
     # print(f"action:{action}")
     return action
 

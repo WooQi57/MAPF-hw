@@ -68,7 +68,7 @@ def main():
         # model.load_dict(model_path+"/model_teenage_stage_58000.pt")
         # model.load_dict(model_path+"/model_baby_stage_30000.pt")
         # model.load_dict(model_path+"/new_model_24000.pt") # 1 starts to go first
-        model.load_dict(model_path+"/latest_model_24000.pt")
+        model.load_dict(model_path+"/astar1_model_22000.pt")
 
 
 
@@ -79,6 +79,7 @@ def main():
         with torch.no_grad():
             obs_tensor = model._get_tensors(obs)
             action_value = model.net(obs_tensor)
+        # import pdb; pdb.set_trace()
         action = select_action(action_value, 0.1, actions_per_robot )
         reward, obs, done, _ = env.step(action)
         print("get reward: ",reward)

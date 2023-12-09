@@ -23,13 +23,14 @@ class AStarPlanner:
         return abs(current.x - goal.x) + abs(current.y - goal.y)
 
     def within_bounds(self, x, y):
-        return 0 <= x < self.width and 0 <= y < self.height
+        return 0 < x < self.width and 0 < y < self.height 
 
     def get_neighbors(self, node):
         neighbors = []
         for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
             nx, ny = node.x + dx, node.y + dy
-            if self.within_bounds(nx, ny) and (nx, ny) not in self.obstacles:
+            if self.within_bounds(nx, ny) and (nx, ny) not in self.obstacles.values():
+                # print('new neighbor:',(nx, ny))
                 neighbors.append(self.Node(nx, ny))
         return neighbors
 

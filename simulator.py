@@ -11,7 +11,7 @@ scale = 35
 
 class Simulator:
 
-    def __init__(self, size, robot_num, obstacle_num=0,static=None, visual=False, debug=False, name =''):
+    def __init__(self, size, robot_num, obstacle_num=0,static=None, visual=False, save_gif=None, debug=False, name =''):
         """
         Initialize simulator multi agent path finding
         robot: {index:(x,y,carry_index)}
@@ -25,6 +25,7 @@ class Simulator:
         self.size = size
         self.width = self.size[0] // scale
         self.height = self.size[1] // scale
+        self.save_gif = save_gif
         self.robot_num = robot_num
         self.obstacle_num = obstacle_num
         # self.observation_per_robot = 6
@@ -40,7 +41,7 @@ class Simulator:
         # self.obstacles = {(2, 2), (3, 3), (4, 4)}  # Example obstacle positions
         self.obstacles = {}
         self.generate_map(robot_num, size, obstacle_num)    
-        self.visual = visual
+        self.visual = visual                                    
         self.debug = debug
         self.path_set = self.get_path_set(AStar=True) # get path set for each robot without using A*
         self.path_length = {key:len(value) for key,value in self.path_set.items()}
@@ -223,8 +224,11 @@ class Simulator:
         if self.debug:
             print(f"done:{done} done_arr:{done_arr} after or:{(1-np.array(reached_goal))}")
 
+        # import pdb; pdb.set_trace()
         if self.visual:
-            self.show_plot(self.robot_last_pos, done, None, wait=self.debug) ########### this was "next_pos" ##############
+            self.show_plot(next_pos, done, None, wait=self.debug) ########### this was "next_pos" ############## type of next pos is different from self.robot_last_pos
+
+            # self.show_plot(self.robot_last_pos, done, None, wait=self.debug) ########### this was "next_pos" ##############
         # return reward, np.array(obs), done_arr, {}
         return reward, np.array(obs), done, {}
     
@@ -235,6 +239,8 @@ class Simulator:
         if AStar:# if using astar_planning, call the A* algorithm
             # astar = AStarPlanner(self.width+1, self.height+1, self.obstacles)
             for id_, pos in self.robot.items():
+                # print('obstacle:',self.obstacles)
+                input()
                 astar = AStarPlanner(self.width, self.height, self.obstacles) ####map size may be wrong
                 path_set[id_] = astar.astar(self.init_robot[id_][0], self.init_robot[id_][1],
                                 self.init_target[id_][0], self.init_target[id_][1])
@@ -415,17 +421,28 @@ class Simulator:
         return collision
     
     def show_plot(self, path, done=False, save_gif=None, wait=False):
-        try:
-            for id_ in path:
-                cv2.line(self.canvas, tuple(np.array(self.robot_last_pos[id_][:2])*scale), tuple(np.array(path[id_][0])*scale), self.colours[id_],5)
-            if done:
-                frame = np.ones(self.size, np.uint8)*255
-                cv2.putText(frame, "Done", (self.size[0]//2-int(2.5*scale), self.size[1]//2), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 0, 255, 128), 2)
-                cv2.imshow("Factory"+self.name,frame)
-                cv2.waitKey(1000)
-            self.show(wait)
-        except Exception as err:
-            print(err)
+
+        wait = False
+        # try:
+        for id_ in path:
+            # import pdb; pdb.set_trace()
+
+            # print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            # print("A", self.robot_last_pos[id_][:2])
+            # print("B", self.robot_last_pos)
+            # print("C",id_)
+            # print("D",path)
+            # print("E",path[id_][0])
+
+            cv2.line(self.canvas, tuple(np.array(self.robot_last_pos[id_][:2])*scale), tuple(np.array(path[id_][0])*scale), self.colours[id_],5)
+        if done:
+            frame = np.ones(self.size, np.uint8)*255
+            cv2.putText(frame, "Done", (self.size[0]//2-int(2.5*scale), self.size[1]//2), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 0, 255, 128), 2)
+            cv2.imshow("Factory"+self.name,frame)
+            cv2.waitKey(1000)
+        self.show(wait)
+        # except Exception as err:
+        #     print(err)
         if save_gif!=None:
             with imageio.get_writer("./image/"+save_gif, fps=0.5, mode="I") as writer:
                 for idx, frame in enumerate(self.frames):
