@@ -38,7 +38,7 @@ class Simulator:
         self.colours = self.assign_colour(robot_num+obstacle_num)
         self.crash = []
         # self.obstacles = {(2, 2), (3, 3), (4, 4)}  # Example obstacle positions
-        self.obstacles = set()
+        self.obstacles = {}
         self.generate_map(robot_num, size, obstacle_num)    
         self.visual = visual
         self.debug = debug
@@ -60,7 +60,7 @@ class Simulator:
         """
         rnd = np.random
         rnd.seed(5258) # 5258
-        assert size[0]*size[1]>robot_num *scale*3
+        assert size[0]*size[1]>(robot_num+obstacle_num) *scale*3
         self.canvas = np.ones(self.size, np.uint8)*255
         for i in range(1,self.width):
             cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.height-1)*scale), (0,0,0))
@@ -80,13 +80,10 @@ class Simulator:
                 self.robot[i] = (pos[i][0],pos[i][1],i)
                 self.target[i] = (pos[i+robot_num][0], pos[i+robot_num][1])
             for ob in range(obstacle_num):
-                self.obstacles.add((pos[2*robot_num+ob][0], pos[2*robot_num+ob][1]))
+                self.obstacles[ob]=(pos[2*robot_num+ob][0], pos[2*robot_num+ob][1])
         self.init_robot = self.robot.copy()
         self.init_target = self.target.copy()
             
-        # for i in range(robot_num):
-        #     self.draw_target(self.canvas, np.array(self.target[i][2:])*scale, self.colours[i+len(self.robot)], 5)
-        #     self.robot_carry[i] = False   
 
     @staticmethod
     def assign_colour(num):
@@ -129,33 +126,33 @@ class Simulator:
             cv2.waitKey(100)
         self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     
-    def get_state_map(self, index, show=False):
-        state = np.zeros((self.width+1, self.h+1))
-        for id_, pos in self.robot.items():
-            if id_ == index:
-                state[pos[0]][pos[1]] = -1
-            else:
-                state[pos[0]][pos[1]] -= -3
-        for id2_, pos2 in self.target.items():
-            if id2_ == self.robot[index][2]:
-                if state[pos2[0]][pos2[1]] == -1:
-                    self.robot_carry[id_] = True
-                    state[pos2[0]][pos2[1]] = 2
-                else:
-                    state[pos2[0]][pos2[1]] += 4
+    # def get_state_map(self, index, show=False):
+    #     state = np.zeros((self.width+1, self.h+1))
+    #     for id_, pos in self.robot.items():
+    #         if id_ == index:
+    #             state[pos[0]][pos[1]] = -1
+    #         else:
+    #             state[pos[0]][pos[1]] -= -3
+    #     for id2_, pos2 in self.target.items():
+    #         if id2_ == self.robot[index][2]:
+    #             if state[pos2[0]][pos2[1]] == -1:
+    #                 self.robot_carry[id_] = True
+    #                 state[pos2[0]][pos2[1]] = 2
+    #             else:
+    #                 state[pos2[0]][pos2[1]] += 4
                 
-        state = np.rot90(state, 1)
-        if show:
-            plt.figure()
-            plt.imshow(state)
-            for i in range(len(state)):
-                for j in range(len(state[0])):
-                    c = str(state[i][j])
-                    plt.text(j, i, c, va='center', ha='center')
-            plt.xlim((-0.5,len(state[0])-0.5))
-            plt.ylim((-0.5,len(state)-0.5))
-            plt.show()
-        return np.array([state])
+    #     state = np.rot90(state, 1)
+    #     if show:
+    #         plt.figure()
+    #         plt.imshow(state)
+    #         for i in range(len(state)):
+    #             for j in range(len(state[0])):
+    #                 c = str(state[i][j])
+    #                 plt.text(j, i, c, va='center', ha='center')
+    #         plt.xlim((-0.5,len(state[0])-0.5))
+    #         plt.ylim((-0.5,len(state)-0.5))
+    #         plt.show()
+    #     return np.array([state])
     
     @staticmethod
     def out_of_map(pos, size):
@@ -178,7 +175,7 @@ class Simulator:
         done_arr = np.array([False for i in range(self.robot_num+1)])  # last entry is for completely done signal, first robot_num entries for each robot's termination
         target_pos = {}
         self.robot_last_pos = self.robot.copy()
-        self.path_length = {key:len(value) for key,value in self.path_set.items()} ## used in reset
+        # self.path_length = {key:len(value) for key,value in self.path_set.items()} ## used in reset
         self.last_path_step = self.path_step.copy()
         predict_next_path_step = np.zeros(self.path_step.shape)
         
@@ -227,7 +224,7 @@ class Simulator:
             print(f"done:{done} done_arr:{done_arr} after or:{(1-np.array(reached_goal))}")
 
         if self.visual:
-            self.show_plot(next_pos, done, None, wait=self.debug)
+            self.show_plot(self.robot_last_pos, done, None, wait=self.debug) ########### this was "next_pos" ##############
         # return reward, np.array(obs), done_arr, {}
         return reward, np.array(obs), done, {}
     
@@ -236,8 +233,9 @@ class Simulator:
         path_set = {}
         
         if AStar:# if using astar_planning, call the A* algorithm
-            astar = AStarPlanner(self.width, self.height, self.obstacles)
+            # astar = AStarPlanner(self.width+1, self.height+1, self.obstacles)
             for id_, pos in self.robot.items():
+                astar = AStarPlanner(self.width, self.height, self.obstacles) ####map size may be wrong
                 path_set[id_] = astar.astar(self.init_robot[id_][0], self.init_robot[id_][1],
                                 self.init_target[id_][0], self.init_target[id_][1])
         else:# if using naive planning, call the naive planning algorithm
@@ -297,18 +295,15 @@ class Simulator:
             # state[4] = self.robot[id_][1]
             # print(self.size)
             ##########wrong##########
-            
 
-            state[3] = self.robot_last_pos[id_][0]/(self.size[0] // scale)
-            state[4] = self.robot_last_pos[id_][1]/(self.size[1] // scale)
+            state[3] = self.robot_last_pos[id_][0]/self.width
+            state[4] = self.robot_last_pos[id_][1]/self.height
             # state[3] = self.robot[id_][0]/self.size
             # state[4] = self.robot[id_][1]/self.size
             state[5] = int(predict_next_collision[id_])
-            
-            ##########new###########
-            state[6] = self.robot[id_][0]/(self.size[0] // scale)
-            state[7] = self.robot[id_][1]/(self.size[1] // scale)
-            ###########new###########
+            state[6] = self.robot[id_][0]/self.width
+            state[7] = self.robot[id_][1]/self.height
+
 
             obs.append(state)
 
@@ -432,58 +427,24 @@ class Simulator:
         except Exception as err:
             print(err)
         if save_gif!=None:
-            with imageio.get_writer("./image/"+save_gif, mode="I") as writer:
+            with imageio.get_writer("./image/"+save_gif, fps=0.5, mode="I") as writer:
                 for idx, frame in enumerate(self.frames):
                     writer.append_data(frame)
         cv2.waitKey(1)
 
-    '''
-    def simple_state(self, index, test=False):
-        me = self.robot[index]
-        state = np.zeros(7)
-        state[0] = (self.target[self.robot[index][2]][0] - self.robot[index][0])/(self.size[0]//scale+1)
-        state[1] = (self.target[self.robot[index][2]][1] - self.robot[index][1])/(self.size[1]//scale+1)
-        if me[0] == 1:
-            # left
-            state[2] = 1
-        elif me[0] == self.size[0]//scale-1:
-            # right
-            state[3] = 1
-        if me[1] == 1:
-            # up
-            state[4] = 1
-        elif me[1] == self.size[1]//scale-1:
-            # down
-            state[5] = 1
-        if self.out_of_map(me, self.size):
-            state[6] = 1
-        
-        for id_, pos in self.robot.items():
-            if id_ == index:
-                continue
-            if np.math.hypot(self.robot[id_][0]-me[0], self.robot[id_][1]-me[1])<1.2:
-                if self.robot[id_][0]-me[0] < 0:
-                    state[2] = 1
-                elif self.robot[id_][0]-me[0] > 0:
-                    state[3] = 1
-                if self.robot[id_][1]-me[1] > 0:
-                    state[5] = 1
-                elif self.robot[id_][1]-me[1] < 0:
-                    state[4] = 1
-                if self.robot[id_][0]-me[0] == 0 and self.robot[id_][1]-me[1] == 0:
-                    state[6] = 1
-        return state
-    '''
 
     def reset(self):
         self.crash = []
         self.robot = {}
-        self.robot_carry = {}
+        self.robot_last_pos = {}
         self.target = {}
         self.steps = 0
         states = []
         self.frames = []
         # self.generate_map(self.robot_num, self.size)
+        self.robot = self.init_robot.copy()
+        self.robot_last_pos = self.init_robot.copy()
+        self.target = self.init_target.copy()
 
         self.path_step = np.zeros((self.robot_num), dtype=int)
         # reset canvas
@@ -493,9 +454,14 @@ class Simulator:
                 cv2.line(self.canvas, (scale*i,scale), (scale*i,(self.height-1)*scale), (0,0,0))
             for i in range(1,self.height):
                 cv2.line(self.canvas, (scale,i*scale), ((self.width-1)*scale,i*scale), (0,0,0))
-
-        self.robot = self.init_robot.copy()
-        self.target = self.init_target.copy()
+            for i in range(self.obstacle_num):
+                self.draw_target(self.canvas, np.array(self.obstacles[i])*scale, self.colours[i+len(self.robot)], 5)
+            
+            init_pos = {}
+            for id_, pos in self.robot.items():
+                init_pos[id_] = [(pos[0], pos[1])]
+            self.show_plot(init_pos, False, save_gif=self.save_gif, wait=self.debug)
+            
         for id_ in self.robot.keys():
             state = np.zeros(self.observation_per_robot)
             states.append(state)
@@ -560,71 +526,6 @@ class Simulator:
                     writer.append_data(frame)
         cv2.waitKey(1)
 
-    '''
-    def stepold(self, action, simple=False):
-        path = {}
-        reward = np.array([-0.3 for i in action])
-        done = [False for i in action]
-        states = []
-        end = {}
-        for id_, pos in self.robot.items():
-            pos2 = self.target[pos[2]]
-            end[id_] = (pos2[0], pos2[1])
-
-            if action[id_] == 0:
-                path[id_] = [(pos[0], pos[1])]
-                reward[id_] -= 0.5
-            elif action[id_] == 1:
-                path[id_] = [(pos[0], pos[1]+1)]
-                if end[id_][1] - pos[1] > 0:
-                    reward[id_] += 1
-                else:
-                     reward[id_] -= 1
-            elif action[id_] == 2:
-                path[id_] = [(pos[0]-1, pos[1])]
-                if end[id_][0] - pos[0] < 0:
-                    reward[id_] += 1
-                else:
-                     reward[id_] -= 1
-            elif action[id_] == 3:
-                path[id_] = [(pos[0]+1, pos[1])]
-                if end[id_][0] - pos[0] > 0:
-                    reward[id_] += 1
-                else:
-                     reward[id_] -= 1
-            elif action[id_] == 4:
-                path[id_] = [(pos[0], pos[1]-1)]
-                if end[id_][1] - pos[1] < 0:
-                    reward[id_] += 1
-                else:
-                     reward[id_] -= 1
-            if self.out_of_map(path[id_][0], self.size):
-                reward[id_] -= 20
-                done[id_] = True
-            if self.steps > 80:
-                done[id_] = True
-
-        self.steps += 1
-        self.start_plot(path, None, False)
-        if len(self.crash) > 0:
-            for i in self.crash:
-                reward[i[0]] -= 20
-                reward[i[1]] -= 20
-                done[i[0]] = True
-                done[i[1]] = True
-        for id_ in self.robot.keys():
-            if simple == False:
-                state = self.get_state_map(id_, False)
-            else:
-                state = self.simple_state(id_, False)
-            states.append(state)
-            # reward -= 0.025*(abs(self.robot[id_][0]-end[id_][0])+abs(self.robot[id_][1]-end[id_][1]))
-            if np.math.hypot(self.robot[id_][0]-end[id_][0], self.robot[id_][1]-end[id_][1])<1:
-                reward[id_] += 30
-                done[id_] = True
-
-        return reward, np.array(states), done, {}
-    '''
     
 if __name__ == "__main__":
     # random initialize

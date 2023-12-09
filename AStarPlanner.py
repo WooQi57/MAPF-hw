@@ -27,7 +27,7 @@ class AStarPlanner:
 
     def get_neighbors(self, node):
         neighbors = []
-        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
             nx, ny = node.x + dx, node.y + dy
             if self.within_bounds(nx, ny) and (nx, ny) not in self.obstacles:
                 neighbors.append(self.Node(nx, ny))
